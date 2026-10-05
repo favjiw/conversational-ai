@@ -1,0 +1,326 @@
+[
+  {
+    "id": 1,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#1 Tamu Makan Malam Impian",
+    "question_id": "Kalau bisa milih siapa pun di dunia ini, siapa yang pengen banget lo undang buat makan malam bareng?",
+    "question_en": "Given the choice of anyone in the world, whom would you want as a dinner guest?",
+    "guidance": "Bahas santai dan seru: 'Kalau bisa milih siapa pun di dunia ini, siapa yang pengen banget lo undang buat makan malam bareng?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 2,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#2 Keinginan Menjadi Terkenal",
+    "question_id": "Pengen gak sih jadi orang terkenal? Terkenal di bidang apa dan dengan cara seperti apa?",
+    "question_en": "Would you like to be famous? In what way?",
+    "guidance": "Bahas santai dan seru: 'Pengen gak sih jadi orang terkenal? Terkenal di bidang apa dan dengan cara seperti apa?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 3,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#3 Latihan Bicara Sebelum Telepon",
+    "question_id": "Sebelum nelpon orang penting, suka latihan dulu gak apa yang mau diomongin? Kenapa tuh?",
+    "question_en": "Before making a telephone call, do you ever rehearse what you are going to say? Why?",
+    "guidance": "Bahas santai dan seru: 'Sebelum nelpon orang penting, suka latihan dulu gak apa yang mau diomongin? Kenapa tuh?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 4,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#4 Definisi Hari Sempurna",
+    "question_id": "Kira-kira hari yang sempurna buat lo itu kayak gimana sih dari pagi sampai malem?",
+    "question_en": "What would constitute a \"perfect\" day for you?",
+    "guidance": "Bahas santai dan seru: 'Kira-kira hari yang sempurna buat lo itu kayak gimana sih dari pagi sampai malem?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 5,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#5 Bernyanyi Sendiri dan Bareng Orang Lain",
+    "question_id": "Kapan terakhir kali lo nyanyi sendiri pas lagi santai atau nyanyi di depan orang lain?",
+    "question_en": "When did you last sing to yourself? To someone else?",
+    "guidance": "Bahas santai dan seru: 'Kapan terakhir kali lo nyanyi sendiri pas lagi santai atau nyanyi di depan orang lain?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 6,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#6 Pilihan Usia 90 Tahun (Pikiran vs Fisik)",
+    "question_id": "Kalau bisa hidup sampai umur 90 tahun, lo lebih milih punya pikiran anak 30 tahun atau fisik anak 30 tahun selama 60 tahun terakhir?",
+    "question_en": "If you were able to live to the age of 90 and retain either the mind or body of a 30-year-old for the last 60 years of your life, which would you want?",
+    "guidance": "Bahas santai dan seru: 'Kalau bisa hidup sampai umur 90 tahun, lo lebih milih punya pikiran anak 30 tahun atau fisik anak 30 tahun selama 60 tahun terakhir?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 7,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#7 Firasat Rahasia Soal Kematian",
+    "question_id": "Pernah punya firasat atau intuisi rahasia gak kira-kira lo bakal berpulang seperti apa nanti?",
+    "question_en": "Do you have a secret hunch about how you will die?",
+    "guidance": "Bahas santai dan seru: 'Pernah punya firasat atau intuisi rahasia gak kira-kira lo bakal berpulang seperti apa nanti?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 8,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#8 Tiga Kesamaan Kita Berdua",
+    "question_id": "Coba sebutin 3 hal kesamaan yang lo rasa kita berdua sama-sama punya!",
+    "question_en": "Name three things you and your partner appear to have in common.",
+    "guidance": "Bahas santai dan seru: 'Coba sebutin 3 hal kesamaan yang lo rasa kita berdua sama-sama punya!'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 9,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#9 Hal Paling Lo Syukuri",
+    "question_id": "Sepanjang hidup lo sampai detik ini, hal apa yang paling lo syukuri?",
+    "question_en": "For what in your life do you feel most grateful?",
+    "guidance": "Bahas santai dan seru: 'Sepanjang hidup lo sampai detik ini, hal apa yang paling lo syukuri?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 10,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#10 Hal yang Ingin Diubah dari Pola Asuh",
+    "question_id": "Kalau bisa muter waktu dan mengubah satu hal dari cara lo dibesarkan dulu, apa yang pengen diubah?",
+    "question_en": "If you could change anything about the way you were raised, what would it be?",
+    "guidance": "Bahas santai dan seru: 'Kalau bisa muter waktu dan mengubah satu hal dari cara lo dibesarkan dulu, apa yang pengen diubah?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 11,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#11 Kisah Hidup Singkat dalam 4 Menit",
+    "question_id": "Coba ceritain garis besar kisah hidup lo yang paling berkesan dan ngebentuk lo jadi sekarang.",
+    "question_en": "Take 4 minutes and tell your partner your life story in as much detail as possible.",
+    "guidance": "Bahas santai dan seru: 'Coba ceritain garis besar kisah hidup lo yang paling berkesan dan ngebentuk lo jadi sekarang.'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 12,
+    "set": "I",
+    "set_label": "Set I: Eksplorasi Diri & Minat",
+    "title": "#12 Kekuatan atau Bakat Impian",
+    "question_id": "Kalau besok pagi bangun tidur tiba-tiba dapet satu kemampuan atau kekuatan baru, pengen dapet apa?",
+    "question_en": "If you could wake up tomorrow having gained any one quality or ability, what would it be?",
+    "guidance": "Bahas santai dan seru: 'Kalau besok pagi bangun tidur tiba-tiba dapet satu kemampuan atau kekuatan baru, pengen dapet apa?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 13,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#13 Pertanyaan ke Bola Kristal",
+    "question_id": "Kalau bola kristal bisa ngasih tau satu kebenaran mutlak soal diri lo, masa depan, atau apa pun, lo mau nanya apa?",
+    "question_en": "If a crystal ball could tell you the truth about yourself, your life, the future, or anything else, what would you want to know?",
+    "guidance": "Bahas santai dan seru: 'Kalau bola kristal bisa ngasih tau satu kebenaran mutlak soal diri lo, masa depan, atau apa pun, lo mau nanya apa?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 14,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#14 Mimpi Lama yang Belum Terwujud",
+    "question_id": "Ada gak satu impian lama yang pengen banget lo lakuin tapi belum kesampean sampai sekarang? Kenapa belum?",
+    "question_en": "Is there something that you've dreamed of doing for a long time? Why haven't you done it?",
+    "guidance": "Bahas santai dan seru: 'Ada gak satu impian lama yang pengen banget lo lakuin tapi belum kesampean sampai sekarang? Kenapa belum?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 15,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#15 Pencapaian Terbesar dalam Hidup",
+    "question_id": "Apa pencapaian atau momen paling membanggakan dalam hidup lo sejauh ini?",
+    "question_en": "What is the greatest accomplishment of your life?",
+    "guidance": "Bahas santai dan seru: 'Apa pencapaian atau momen paling membanggakan dalam hidup lo sejauh ini?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 16,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#16 Nilai Tertinggi dalam Persahabatan",
+    "question_id": "Buat lo pribadi, apa nilai atau kualitas yang paling lo hargai dari seorang sahabat?",
+    "question_en": "What do you value most in a friendship?",
+    "guidance": "Bahas santai dan seru: 'Buat lo pribadi, apa nilai atau kualitas yang paling lo hargai dari seorang sahabat?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 17,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#17 Memori Paling Indah dan Berharga",
+    "question_id": "Memori apa di masa lalu yang paling berharga dan selalu bikin lo tersenyum hangat pas diingat?",
+    "question_en": "What is your most treasured memory?",
+    "guidance": "Bahas santai dan seru: 'Memori apa di masa lalu yang paling berharga dan selalu bikin lo tersenyum hangat pas diingat?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 18,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#18 Memori Paling Berat atau Buruk",
+    "question_id": "Momen atau memori apa yang paling berat atau kelam yang pernah lo lewatin tapi berhasil lo lewatin?",
+    "question_en": "What is your most terrible memory?",
+    "guidance": "Bahas santai dan seru: 'Momen atau memori apa yang paling berat atau kelam yang pernah lo lewatin tapi berhasil lo lewatin?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 19,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#19 Jika Hidup Tinggal Satu Tahun",
+    "question_id": "Kalau lo tau sisa hidup lo tinggal setahun lagi, ada gak gaya hidup atau kebiasaan lo sekarang yang bakal langsung lo ubah?",
+    "question_en": "If you knew that in one year you would die suddenly, would you change anything about the way you are now living? Why?",
+    "guidance": "Bahas santai dan seru: 'Kalau lo tau sisa hidup lo tinggal setahun lagi, ada gak gaya hidup atau kebiasaan lo sekarang yang bakal langsung lo ubah?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 20,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#20 Arti Persahabatan Sejati",
+    "question_id": "Sebenernya arti persahabatan sejati buat lo itu apa sih maknanya?",
+    "question_en": "What does friendship mean to you?",
+    "guidance": "Bahas santai dan seru: 'Sebenernya arti persahabatan sejati buat lo itu apa sih maknanya?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 21,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#21 Peran Cinta dan Kasih Sayang",
+    "question_id": "Seberapa besar peran cinta, afeksi, dan kasih sayang dalam ngejalanin hari-hari lo?",
+    "question_en": "What roles do love and affection play in your life?",
+    "guidance": "Bahas santai dan seru: 'Seberapa besar peran cinta, afeksi, dan kasih sayang dalam ngejalanin hari-hari lo?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 22,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#22 Hal Positif dari Rekan Siaran",
+    "question_id": "Coba sebutin hal-hal positif atau sifat baik yang lo kagumi dari lawan siaran lo!",
+    "question_en": "Alternate sharing something you consider a positive characteristic of your partner. Share a total of 5 items.",
+    "guidance": "Bahas santai dan seru: 'Coba sebutin hal-hal positif atau sifat baik yang lo kagumi dari lawan siaran lo!'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 23,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#23 Kehangatan Keluarga dan Masa Kecil",
+    "question_id": "Seberapa dekat dan hangat keluarga lo? Apakah ngerasa masa kecil lo bahagia?",
+    "question_en": "How close and warm is your family? Do you feel your childhood was happier than most other people's?",
+    "guidance": "Bahas santai dan seru: 'Seberapa dekat dan hangat keluarga lo? Apakah ngerasa masa kecil lo bahagia?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 24,
+    "set": "II",
+    "set_label": "Set II: Refleksi & Memori",
+    "title": "#24 Hubungan dengan Ibu",
+    "question_id": "Gimana pandangan dan perasaan lo soal hubungan lo dengan ibu tercinta?",
+    "question_en": "How do you feel about your relationship with your mother?",
+    "guidance": "Bahas santai dan seru: 'Gimana pandangan dan perasaan lo soal hubungan lo dengan ibu tercinta?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 25,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#25 Pernyataan Kebersamaan Kita",
+    "question_id": "Bikin 3 kalimat yang dimulai dengan kata 'Kita berdua saat ini...' yang beneran lo rasain.",
+    "question_en": "Make 3 true \"we\" statements each. For instance \"We are both in this room feeling . . .\"",
+    "guidance": "Bahas santai dan seru: 'Bikin 3 kalimat yang dimulai dengan kata 'Kita berdua saat ini...' yang beneran lo rasain.'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 26,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#26 Keinginan Punya Teman Berbagi",
+    "question_id": "Lengkapi kalimat ini: 'Gue pengen banget punya seseorang buat berbagi hal...'",
+    "question_en": "Complete this sentence: \"I wish I had someone with whom I could share . . .\"",
+    "guidance": "Bahas santai dan seru: 'Lengkapi kalimat ini: 'Gue pengen banget punya seseorang buat berbagi hal...''. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 27,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#27 Hal Penting yang Perlu Diketahui Sahabat",
+    "question_id": "Kalau kita berdua mau jadi sahabat dekat seumur hidup, hal penting apa soal lo yang wajib banget diketahui?",
+    "question_en": "If you were going to become a close friend with your partner, please share what would be important for him or her to know.",
+    "guidance": "Bahas santai dan seru: 'Kalau kita berdua mau jadi sahabat dekat seumur hidup, hal penting apa soal lo yang wajib banget diketahui?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 28,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#28 Hal yang Lo Sukai dari Partner Bicara",
+    "question_id": "Jujur-jujuran, apa yang paling lo sukai atau apresiasi dari partner lo sekarang?",
+    "question_en": "Tell your partner what you like about them; be very honest this time saying things that you might not say to someone you've just met.",
+    "guidance": "Bahas santai dan seru: 'Jujur-jujuran, apa yang paling lo sukai atau apresiasi dari partner lo sekarang?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 29,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#29 Momen Paling Memalukan dalam Hidup",
+    "question_id": "Ceritain satu momen paling memalukan atau konyol yang pernah kejadian di hidup lo!",
+    "question_en": "Share with your partner an embarrassing moment in your life.",
+    "guidance": "Bahas santai dan seru: 'Ceritain satu momen paling memalukan atau konyol yang pernah kejadian di hidup lo!'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 30,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#30 Kapan Terakhir Kali Menangis",
+    "question_id": "Kapan terakhir kali lo nangis? Pas sendirian atau pas di depan orang lain?",
+    "question_en": "When did you last cry in front of another person? By yourself?",
+    "guidance": "Bahas santai dan seru: 'Kapan terakhir kali lo nangis? Pas sendirian atau pas di depan orang lain?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 31,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#31 Kesan Pertama yang Disukai",
+    "question_id": "Sebutin satu hal yang dari awal lo udah suka atau kagumi dari rekan lo!",
+    "question_en": "Tell your partner something that you like about them already.",
+    "guidance": "Bahas santai dan seru: 'Sebutin satu hal yang dari awal lo udah suka atau kagumi dari rekan lo!'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 32,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#32 Hal yang Tabu Dijadikan Lelucon",
+    "question_id": "Menurut lo, hal apa sih yang terlalu serius dan gak pantas dijadiin bahan bercandaan?",
+    "question_en": "What, if anything, is too serious to be joked about?",
+    "guidance": "Bahas santai dan seru: 'Menurut lo, hal apa sih yang terlalu serius dan gak pantas dijadiin bahan bercandaan?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 33,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#33 Penyesalan Kata yang Belum Tersampaikan",
+    "question_id": "Kalau hari ini hari terakhir lo, kata-kata apa yang paling lo sesali belum sempat lo ucapin ke seseorang?",
+    "question_en": "If you were to die this evening with no opportunity to communicate with anyone, what would you most regret not having told someone? Why haven't you told them yet?",
+    "guidance": "Bahas santai dan seru: 'Kalau hari ini hari terakhir lo, kata-kata apa yang paling lo sesali belum sempat lo ucapin ke seseorang?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 34,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#34 Barang Terakhir yang Diselamatkan saat Kebakaran",
+    "question_id": "Kalau rumah kebakaran dan semua orang aman, cuma ada waktu nyelamatin satu barang berharga, apa yang bakal lo ambil?",
+    "question_en": "Your house, containing everything you own, catches fire. After saving your loved ones and pets, you have time to safely make a final dash to save any one item. What would it be? Why?",
+    "guidance": "Bahas santai dan seru: 'Kalau rumah kebakaran dan semua orang aman, cuma ada waktu nyelamatin satu barang berharga, apa yang bakal lo ambil?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 35,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#35 Kehilangan yang Paling Mengguncang",
+    "question_id": "Dari semua orang terdekat, kepergian siapa yang paling bikin lo takut dan terpukul?",
+    "question_en": "Of all the people in your family, whose death would you find most disturbing? Why?",
+    "guidance": "Bahas santai dan seru: 'Dari semua orang terdekat, kepergian siapa yang paling bikin lo takut dan terpukul?'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  },
+  {
+    "id": 36,
+    "set": "III",
+    "set_label": "Set III: Koneksi & Eksistensial",
+    "title": "#36 Curhat Masalah dan Minta Masukan",
+    "question_id": "Curhatin satu kegelisahan atau masalah lo saat ini, dan minta saran tulus dari rekan lo.",
+    "question_en": "Share a personal problem and ask your partner's advice on how he or she might handle it. Also, ask your partner to reflect back to you how you seem to be feeling about the problem you have chosen.",
+    "guidance": "Bahas santai dan seru: 'Curhatin satu kegelisahan atau masalah lo saat ini, dan minta saran tulus dari rekan lo.'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+  }
+]
