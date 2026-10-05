@@ -1,0 +1,28 @@
+{
+  "id": "dtdd",
+  "name": "Dark Triad Dirty Dozen",
+  "aspect": "personality",
+  "instruction": "Please indicate how much you agree with each statement about yourself (1 = Strongly disagree to 7 = Strongly agree).",
+  "scale_min": 1,
+  "scale_max": 7,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "I tend to manipulate people to get what I want.", "reverse": false},
+    {"id": 2, "text": "I have used deceit or lied to get what I want.", "reverse": false},
+    {"id": 3, "text": "I have used flattery to get what I want.", "reverse": false},
+    {"id": 4, "text": "I tend to exploit others towards my own end.", "reverse": false},
+    {"id": 5, "text": "I tend to lack remorse.", "reverse": false},
+    {"id": 6, "text": "I tend to be unconcerned with the morality of my actions.", "reverse": false},
+    {"id": 7, "text": "I tend to be callous or insensitive.", "reverse": false},
+    {"id": 8, "text": "I tend to be cynical.", "reverse": false},
+    {"id": 9, "text": "I tend to want others to admire me.", "reverse": false},
+    {"id": 10, "text": "I tend to want others to pay attention to me.", "reverse": false},
+    {"id": 11, "text": "I tend to seek prestige or status.", "reverse": false},
+    {"id": 12, "text": "I tend to expect special favors from others.", "reverse": false}
+  ],
+  "subscales": {
+    "machiavellianism": [1, 2, 3, 4],
+    "psychopathy": [5, 6, 7, 8],
+    "narcissism": [9, 10, 11, 12]
+  }
+}

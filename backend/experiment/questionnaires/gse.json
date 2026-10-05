@@ -1,0 +1,24 @@
+{
+  "id": "gse",
+  "name": "General Self-Efficacy Scale",
+  "aspect": "motivation",
+  "instruction": "Please indicate how true each statement is for you (1 = Not at all true, 2 = Hardly true, 3 = Moderately true, 4 = Exactly true).",
+  "scale_min": 1,
+  "scale_max": 4,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "I can always manage to solve difficult problems if I try hard enough.", "reverse": false},
+    {"id": 2, "text": "If someone opposes me, I can find the means and ways to get what I want.", "reverse": false},
+    {"id": 3, "text": "It is easy for me to stick to my aims and accomplish my goals.", "reverse": false},
+    {"id": 4, "text": "I am confident that I could deal efficiently with unexpected events.", "reverse": false},
+    {"id": 5, "text": "Thanks to my resourcefulness, I know how to handle unforeseen situations.", "reverse": false},
+    {"id": 6, "text": "I can solve most problems if I invest the necessary effort.", "reverse": false},
+    {"id": 7, "text": "I can remain calm when facing difficulties because I can rely on my coping abilities.", "reverse": false},
+    {"id": 8, "text": "When I am confronted with a problem, I can usually find several solutions.", "reverse": false},
+    {"id": 9, "text": "If I am in trouble, I can usually think of a good way out.", "reverse": false},
+    {"id": 10, "text": "I can usually handle whatever comes my way.", "reverse": false}
+  ],
+  "subscales": {
+    "overall": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  }
+}

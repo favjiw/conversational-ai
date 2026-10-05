@@ -137,11 +137,18 @@ class MockLLMClient(LLMClient):
                 },
                 "ledger_updates": [],
             }
+        elif "JSON array of numbers" in prompt or "Rate each" in prompt or "questionnaire" in prompt.lower():
+            # Mock questionnaire response for experiment testing
+            import re
+            item_matches = re.findall(r"^\s*(\d+)\.\s+", prompt, flags=re.MULTILINE)
+            count = len(set(item_matches)) if item_matches else 10
+            mock_ratings = [((self._call_count + i) % 4) + 2 for i in range(count)]
+            parsed = mock_ratings
+            raw = json.dumps(parsed)
         else:
             # Generic mock
             parsed = {"text": f"[Mock response {self._call_count}]"}
-
-        raw = json.dumps(parsed, ensure_ascii=False)
+            raw = json.dumps(parsed, ensure_ascii=False)
         latency_ms = int((time.perf_counter() - start) * 1000)
 
         return LLMResponse(

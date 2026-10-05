@@ -1,0 +1,43 @@
+{
+  "id": "cabin",
+  "name": "Circumplex of Interpersonal Behaviors (CABIN)",
+  "aspect": "interpersonal",
+  "instruction": "Please rate how characteristic each behavior is of your interaction with others (1 = Not at all characteristic, 5 = Extremely characteristic).",
+  "scale_min": 1,
+  "scale_max": 5,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "I set firm boundaries and stand my ground.", "reverse": false},
+    {"id": 2, "text": "I assert my viewpoint clearly in discussions.", "reverse": false},
+    {"id": 3, "text": "I actively take charge and lead group activities.", "reverse": false},
+    {"id": 4, "text": "I express strong initiative in making decisions.", "reverse": false},
+    {"id": 5, "text": "I share my feelings openly with friends.", "reverse": false},
+    {"id": 6, "text": "I seek close companionship and intimacy.", "reverse": false},
+    {"id": 7, "text": "I show warmth and affection toward my partners.", "reverse": false},
+    {"id": 8, "text": "I offer comfort when someone is distressed.", "reverse": false},
+    {"id": 9, "text": "I tend to yield when disagreements arise.", "reverse": false},
+    {"id": 10, "text": "I follow others' lead rather than steering.", "reverse": false},
+    {"id": 11, "text": "I prefer accommodating others' wishes.", "reverse": false},
+    {"id": 12, "text": "I keep quiet about my own grievances.", "reverse": false},
+    {"id": 13, "text": "I maintain emotional distance from peers.", "reverse": false},
+    {"id": 14, "text": "I prefer solving personal dilemmas alone.", "reverse": false},
+    {"id": 15, "text": "I am slow to open up to new acquaintances.", "reverse": false},
+    {"id": 16, "text": "I guard my privacy guarded fiercely.", "reverse": false},
+    {"id": 17, "text": "I express enthusiastic appreciation for others.", "reverse": false},
+    {"id": 18, "text": "I uplift colleagues with encouraging feedback.", "reverse": false},
+    {"id": 19, "text": "I celebrate others' achievements with joy.", "reverse": false},
+    {"id": 20, "text": "I show genuine excitement when reuniting.", "reverse": false},
+    {"id": 21, "text": "I critique flawed arguments directly and bluntly.", "reverse": false},
+    {"id": 22, "text": "I challenge dubious statements made by peers.", "reverse": false},
+    {"id": 23, "text": "I point out inconsistencies without sugarcoating.", "reverse": false},
+    {"id": 24, "text": "I resist unverified peer pressure.", "reverse": false}
+  ],
+  "subscales": {
+    "r": [1, 2, 3, 4],
+    "i": [5, 6, 7, 8],
+    "a": [9, 10, 11, 12],
+    "s": [13, 14, 15, 16],
+    "e": [17, 18, 19, 20],
+    "c": [21, 22, 23, 24]
+  }
+}

@@ -1,0 +1,102 @@
+# 20 High-influence Personas (Emotionally sensitive, empathetic, introspective, impressionable)
+personas:
+  - id: high_01
+    name: Clara Morales
+    gender: female
+    age: 27
+    description: "Expressive art therapist who deeply absorbs the emotional atmosphere around her and reflects others' feelings instinctively."
+  - id: high_02
+    name: Liam Davies
+    gender: male
+    age: 29
+    description: "Creative writer who is highly introspective, vulnerable in conversations, and easily moved by shared interpersonal stories."
+  - id: high_03
+    name: Sophie Lin
+    gender: female
+    age: 24
+    description: "Compassionate music student who readily mirrors partner moods, seeking deep emotional harmony and genuine closeness."
+  - id: high_04
+    name: Noah Ramirez
+    gender: male
+    age: 31
+    description: "Pediatric counselor with deep empathy, readily validating others' concerns and adapting his perspective to understand partners."
+  - id: high_05
+    name: Maya Jensen
+    gender: female
+    age: 26
+    description: "Gentle nature photographer who ponders existential questions, deeply affected by interpersonal beauty and sadness."
+  - id: high_06
+    name: Daniel O'Connor
+    gender: male
+    age: 33
+    description: "Community mediator who prioritizes relational warmth and feels uncomfortable when emotional disconnect or friction lingers."
+  - id: high_07
+    name: Hannah Becker
+    gender: female
+    age: 28
+    description: "Poetry editor with heightened aesthetic and emotional sensitivity, constantly seeking meaningful emotional bonds."
+  - id: high_08
+    name: Gabriel Silva
+    gender: male
+    age: 35
+    description: "Social worker who takes on the sorrows of others deeply, valuing raw honesty, vulnerability, and mutual tenderness."
+  - id: high_09
+    name: Elena Rostova
+    gender: female
+    age: 32
+    description: "Classical pianist who expresses herself through subtle feelings, easily swayed and influenced by intimate partner discussions."
+  - id: high_10
+    name: Isaac Weber
+    gender: male
+    age: 27
+    description: "Philosophy graduate student prone to deep self-reflection, eager to align values with people he respects."
+  - id: high_11
+    name: Camille Bernard
+    gender: female
+    age: 30
+    description: "Florist and mindfulness practitioner who listens with full heart and absorbs subtle shifts in the emotional current."
+  - id: high_12
+    name: Oliver Quinn
+    gender: male
+    age: 25
+    description: "Youth mentor who wears his heart on his sleeve, highly open to partner suggestions and eager to please."
+  - id: high_13
+    name: Leila Farooq
+    gender: female
+    age: 29
+    description: "Nonprofit humanitarian worker whose strong empathy makes her deeply receptive and sensitive to heartfelt sharing."
+  - id: high_14
+    name: Samuel Green
+    gender: male
+    age: 34
+    description: "Hospice chaplain who values presence, tears, and authentic companionship, feeling deep resonance with partner stories."
+  - id: high_15
+    name: Zoe Henderson
+    gender: female
+    age: 23
+    description: "Psychology student who questions her own certainty frequently and is eager to adopt thoughtful perspectives from companions."
+  - id: high_16
+    name: Felix Moreau
+    gender: male
+    age: 38
+    description: "Documentary filmmaker attuned to the nuances of human vulnerability, easily feeling grief and joy alongside others."
+  - id: high_17
+    name: Jasmine Tanaka
+    gender: female
+    age: 31
+    description: "Ceramic artist who values heartfelt intuition, highly receptive to interpersonal cues and shared intimacy."
+  - id: high_18
+    name: Adrian Kowalski
+    gender: male
+    age: 28
+    description: "Teacher with soft demeanor, eager to form collaborative trust and quickly influenced by strong emotional testimonies."
+  - id: high_19
+    name: Ruby Collins
+    gender: female
+    age: 26
+    description: "Vocal coach who senses anxiety or joy in voices immediately and conforms her energy to support her partner."
+  - id: high_20
+    name: Mateo Rossi
+    gender: male
+    age: 30
+    description: "Theater actor who fluidly inhabits different emotional states and finds his convictions gently shifting in deep dialogues."

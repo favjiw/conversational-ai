@@ -1,0 +1,50 @@
+experiment_id: exp_full_replication
+profile: full
+alpha: 0.05
+
+models:
+  - id: gemini_lite
+    provider: google
+    model_name: gemini-3.5-flash-lite
+    size_group: undisclosed
+    family: gemini
+    api_key_env: GEMINI_API_KEY
+
+conditions:
+  - condition_id: rq1_gemini_lite
+    research_question: RQ1
+    persona_type: none
+    model_id: gemini_lite
+    n_runs: 20
+  - condition_id: rq2_gemini_lite_low
+    research_question: RQ2
+    persona_type: low
+    persona_file: backend/experiment/personas/low.yaml
+    model_id: gemini_lite
+    n_runs: 10
+  - condition_id: rq2_gemini_lite_high
+    research_question: RQ2
+    persona_type: high
+    persona_file: backend/experiment/personas/high.yaml
+    model_id: gemini_lite
+    n_runs: 10
+
+conversation:
+  temperature: 0.7
+  max_tokens: 256
+  themes_file: backend/experiment/data/themes_aron1997.json
+
+questionnaire:
+  temperature: 0.0
+  repeats: 10
+  snapshots: [12, 24, 36]
+  agents_measured: ["A", "B"]
+  include: ["all"]
+  max_retries: 3
+
+runtime:
+  concurrency: 1
+  max_retries: 5
+  log_dir: backend/logs/experiments
+  llm_mode: live
+  seed: 42

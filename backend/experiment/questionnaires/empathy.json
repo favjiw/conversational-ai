@@ -1,0 +1,30 @@
+{
+  "id": "empathy",
+  "name": "Toronto Empathy Questionnaire",
+  "aspect": "emotion",
+  "instruction": "Below is a list of statements. Please read each statement carefully and rate how frequently you feel or act that way (0 = Never, 1 = Rarely, 2 = Sometimes, 3 = Often, 4 = Always).",
+  "scale_min": 0,
+  "scale_max": 4,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "When someone else is feeling excited, I tend to get excited too.", "reverse": false},
+    {"id": 2, "text": "Other people's misfortunes do not disturb me a great deal.", "reverse": true},
+    {"id": 3, "text": "It upsets me to see someone being treated disrespectfully.", "reverse": false},
+    {"id": 4, "text": "I remain unaffected when someone close to me is happy.", "reverse": true},
+    {"id": 5, "text": "I enjoy making other people feel better.", "reverse": false},
+    {"id": 6, "text": "I have tender, concerned feelings for people less fortunate than me.", "reverse": false},
+    {"id": 7, "text": "When a friend starts to talk about his/her problems, I try to steer the conversation to something else.", "reverse": true},
+    {"id": 8, "text": "I can tell when others are sad even when they do not say anything.", "reverse": false},
+    {"id": 9, "text": "I find that I am 'in tune' with other people's moods.", "reverse": false},
+    {"id": 10, "text": "I do not feel sympathy for people who cause their own serious problems.", "reverse": true},
+    {"id": 11, "text": "I become irritated when someone cries.", "reverse": true},
+    {"id": 12, "text": "I am not really interested in how other people feel.", "reverse": true},
+    {"id": 13, "text": "I get a strong urge to help when I see someone who is upset.", "reverse": false},
+    {"id": 14, "text": "When I see someone being taken advantage of, I feel kind of protective towards them.", "reverse": false},
+    {"id": 15, "text": "I can easily empathize with what characters in a book or movie are feeling.", "reverse": false},
+    {"id": 16, "text": "I am interested in other people's problems.", "reverse": false}
+  ],
+  "subscales": {
+    "overall": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  }
+}

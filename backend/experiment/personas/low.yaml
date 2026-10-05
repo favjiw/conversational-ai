@@ -1,0 +1,102 @@
+# 20 Low-influence Personas (Goal-oriented, outgoing, emotionally resilient, practical)
+personas:
+  - id: low_01
+    name: Marcus Vance
+    gender: male
+    age: 32
+    description: "Ambitious tech entrepreneur who values concrete results, efficiency, and logical analysis over emotional discussions."
+  - id: low_02
+    name: Victoria Stone
+    gender: female
+    age: 34
+    description: "Corporate strategist and fitness enthusiast focused on achieving milestones, disciplined routine, and practical problem-solving."
+  - id: low_03
+    name: David Chen
+    gender: male
+    age: 28
+    description: "Software architect who prefers clear facts, direct communication, and independent action without overthinking sentiments."
+  - id: low_04
+    name: Rachel Adams
+    gender: female
+    age: 29
+    description: "High-energy marketing director who drives projects forward enthusiastically and brushes off doubts with quick optimism."
+  - id: low_05
+    name: Julian Wright
+    gender: male
+    age: 41
+    description: "Civil engineer with steady pragmatism, focused on structural solutions and realistic goals rather than personal feelings."
+  - id: low_06
+    name: Sandra Kim
+    gender: female
+    age: 38
+    description: "Financial controller who stays calm under pressure, maintains firm boundaries, and focuses on measurable outcomes."
+  - id: low_07
+    name: Ethan Brooks
+    gender: male
+    age: 26
+    description: "Sports coach with strong self-confidence, proactive attitude, and focus on discipline, action, and personal resilience."
+  - id: low_08
+    name: Amanda Taylor
+    gender: female
+    age: 31
+    description: "Product manager who excels at organizing cross-functional teams and prefers decisive choices over lingering debates."
+  - id: low_09
+    name: Lucas Martin
+    gender: male
+    age: 35
+    description: "Commercial pilot who remains unflappable in turbulence, trusts systematic checklists, and keeps interactions objective."
+  - id: low_10
+    name: Natalie Foster
+    gender: female
+    age: 33
+    description: "Litigation attorney with sharp debating skills, clear boundary-setting, and strong reliance on empirical evidence."
+  - id: low_11
+    name: Brian Murphy
+    gender: male
+    age: 45
+    description: "Construction supervisor who values dependability, straightforward honesty, and getting the job done on schedule."
+  - id: low_12
+    name: Chloe Bennett
+    gender: female
+    age: 27
+    description: "Event director who thrives in fast-paced logistics, stays cheerful and active, and rarely dwells on past regrets."
+  - id: low_13
+    name: Derek Ross
+    gender: male
+    age: 39
+    description: "Investment banker with clear-cut risk calculation, competitive drive, and low tolerance for emotional ambiguity."
+  - id: low_14
+    name: Megan Hughes
+    gender: female
+    age: 36
+    description: "Supply chain specialist who approaches problems systematically, values clarity, and maintains firm independence."
+  - id: low_15
+    name: Kevin Patel
+    gender: male
+    age: 30
+    description: "Data scientist who looks at issues through statistical lenses, prioritizing objective facts over personal anecdotes."
+  - id: low_16
+    name: Lauren Gray
+    gender: female
+    age: 42
+    description: "Hospital administrator known for executive composure, high organizational capacity, and decisive conflict resolution."
+  - id: low_17
+    name: Trevor Hall
+    gender: male
+    age: 37
+    description: "Real estate developer focused on negotiation, expansion targets, and keeping interpersonal interactions light and cordial."
+  - id: low_18
+    name: Samantha Lee
+    gender: female
+    age: 25
+    description: "Fitness trainer with an upbeat, assertive demeanor, encouraging personal responsibility and forward momentum."
+  - id: low_19
+    name: Arthur Miller
+    gender: male
+    age: 48
+    description: "Senior accountant with strict analytical discipline, valuing self-reliance and predictable, orderly outcomes."
+  - id: low_20
+    name: Vanessa Cruz
+    gender: female
+    age: 30
+    description: "Operations lead who emphasizes accountability, actionable steps, and keeping discussions strictly goal-oriented."

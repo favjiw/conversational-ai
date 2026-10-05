@@ -1,0 +1,26 @@
+{
+  "id": "eis",
+  "name": "Emotional Intelligence Scale (Schutte)",
+  "aspect": "emotion",
+  "instruction": "Indicate the extent to which each item describes you (1 = Strongly disagree, 2 = Disagree, 3 = Neutral, 4 = Agree, 5 = Strongly agree).",
+  "scale_min": 1,
+  "scale_max": 5,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "I know when to speak about my personal problems to others.", "reverse": false},
+    {"id": 2, "text": "When I am faced with obstacles, I remember times I faced similar obstacles and overcame them.", "reverse": false},
+    {"id": 3, "text": "I expect that I will do well on most things I try.", "reverse": false},
+    {"id": 4, "text": "Other people find it easy to confide in me.", "reverse": false},
+    {"id": 5, "text": "I find it hard to understand the non-verbal messages of other people.", "reverse": true},
+    {"id": 6, "text": "Some of the major events of my life have led me to re-evaluate what is important and not important.", "reverse": false},
+    {"id": 7, "text": "When my mood changes, I see new possibilities.", "reverse": false},
+    {"id": 8, "text": "Emotions are one of the things that make my life worth living.", "reverse": false},
+    {"id": 9, "text": "I am aware of my emotions as I experience them.", "reverse": false},
+    {"id": 10, "text": "I expect good things to happen.", "reverse": false},
+    {"id": 11, "text": "I like to share my emotions with others.", "reverse": false},
+    {"id": 12, "text": "When I experience a positive emotion, I know how to make it last.", "reverse": false}
+  ],
+  "subscales": {
+    "overall": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  }
+}

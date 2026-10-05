@@ -1,0 +1,24 @@
+{
+  "id": "lotr",
+  "name": "Life Orientation Test - Revised",
+  "aspect": "motivation",
+  "instruction": "Please be as honest and accurate as you can. Try not to let your response to one statement influence your responses to other statements (1 = Strongly disagree, 2 = Disagree, 3 = Neutral, 4 = Agree, 5 = Strongly agree).",
+  "scale_min": 1,
+  "scale_max": 5,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "In uncertain times, I usually expect the best.", "reverse": false},
+    {"id": 2, "text": "It's easy for me to relax.", "reverse": false},
+    {"id": 3, "text": "If something can go wrong for me, it will.", "reverse": true},
+    {"id": 4, "text": "I'm always optimistic about my future.", "reverse": false},
+    {"id": 5, "text": "I enjoy my friends a lot.", "reverse": false},
+    {"id": 6, "text": "It's important for me to keep busy.", "reverse": false},
+    {"id": 7, "text": "I hardly ever expect things to go my way.", "reverse": true},
+    {"id": 8, "text": "I don't get upset too easily.", "reverse": false},
+    {"id": 9, "text": "I rarely count on good things happening to me.", "reverse": true},
+    {"id": 10, "text": "Overall, I expect more good things to happen to me than bad.", "reverse": false}
+  ],
+  "subscales": {
+    "overall": [1, 3, 4, 7, 9, 10]
+  }
+}

@@ -1,0 +1,43 @@
+experiment_id: exp_pilot_gemini
+profile: pilot
+alpha: 0.05
+
+models:
+  - id: gemini_lite
+    provider: google
+    model_name: gemini-3.5-flash-lite
+    size_group: undisclosed
+    family: gemini
+    api_key_env: GEMINI_API_KEY
+  - id: mock_model
+    provider: mock
+    model_name: mock-agent
+    size_group: undisclosed
+    family: mock
+
+conditions:
+  - condition_id: rq1_gemini_lite
+    research_question: RQ1
+    persona_type: none
+    model_id: gemini_lite
+    n_runs: 3
+
+conversation:
+  temperature: 0.7
+  max_tokens: 256
+  themes_file: backend/experiment/data/themes_aron1997.json
+
+questionnaire:
+  temperature: 0.0
+  repeats: 3
+  snapshots: [12, 24, 36]
+  agents_measured: ["A", "B"]
+  include: ["all"]
+  max_retries: 3
+
+runtime:
+  concurrency: 1
+  max_retries: 5
+  log_dir: backend/logs/experiments
+  llm_mode: live
+  seed: 42

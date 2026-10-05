@@ -1,0 +1,25 @@
+{
+  "id": "lms",
+  "name": "Love of Money Scale (LMS)",
+  "aspect": "motivation",
+  "instruction": "Please indicate your level of agreement with the following statements (1 = Strongly disagree, 2 = Disagree, 3 = Neutral, 4 = Agree, 5 = Strongly agree).",
+  "scale_min": 1,
+  "scale_max": 5,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "I want to be rich.", "reverse": false},
+    {"id": 2, "text": "It would be wonderful to be wealthy.", "reverse": false},
+    {"id": 3, "text": "Having a lot of financial wealth is a key dream of mine.", "reverse": false},
+    {"id": 4, "text": "Money motivates me to work harder.", "reverse": false},
+    {"id": 5, "text": "Financial incentives strongly inspire my daily efforts.", "reverse": false},
+    {"id": 6, "text": "I am driven to achieve goals when tangible rewards are offered.", "reverse": false},
+    {"id": 7, "text": "Money is an important measure of personal success.", "reverse": false},
+    {"id": 8, "text": "Money gives you respect in society.", "reverse": false},
+    {"id": 9, "text": "Financial stability is essential to high self-worth.", "reverse": false}
+  ],
+  "subscales": {
+    "rich": [1, 2, 3],
+    "motivator": [4, 5, 6],
+    "important": [7, 8, 9]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "icb",
+  "name": "Interpersonal Competence Scale",
+  "aspect": "interpersonal",
+  "instruction": "Rate how competent and comfortable you feel in carrying out each interpersonal situation (1 = Poor, 5 = Extremely good).",
+  "scale_min": 1,
+  "scale_max": 5,
+  "aggregation": "mean",
+  "items": [
+    {"id": 1, "text": "Initiating conversations with strangers or new acquaintances.", "reverse": false},
+    {"id": 2, "text": "Asking someone out on a friendly or collaborative outing.", "reverse": false},
+    {"id": 3, "text": "Introducing yourself to people you don't know well.", "reverse": false},
+    {"id": 4, "text": "Disclosing intimate personal details to close friends.", "reverse": false},
+    {"id": 5, "text": "Confiding in companions when you feel vulnerable.", "reverse": false},
+    {"id": 6, "text": "Telling a companion you appreciate what they did for you.", "reverse": false},
+    {"id": 7, "text": "Confronting a friend about irritating or unfair behavior.", "reverse": false},
+    {"id": 8, "text": "Standing up for your rights when treated unfairly.", "reverse": false},
+    {"id": 9, "text": "Saying 'no' politely when someone asks unreasonable favors.", "reverse": false},
+    {"id": 10, "text": "Helping a friend manage and work through emotional distress.", "reverse": false},
+    {"id": 11, "text": "Listening patiently when someone vents their troubles.", "reverse": false},
+    {"id": 12, "text": "Giving helpful, comforting advice to a discouraged peer.", "reverse": false}
+  ],
+  "subscales": {
+    "overall": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  }
+}
