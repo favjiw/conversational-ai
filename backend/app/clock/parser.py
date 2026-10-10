@@ -40,6 +40,20 @@ def load_clock(path: str | Path) -> Clock:
     return clock
 
 
+
+def load_pagi_bener_clock() -> Clock:
+    """Load the default 1-hour Pagi Bener clock rundown."""
+    candidates = [
+        Path("clock-pagi-bener-live-1jam.json"),
+        Path(__file__).resolve().parent.parent.parent.parent / "clock-pagi-bener-live-1jam.json",
+        Path(__file__).resolve().parent.parent / "data" / "clock-pagi-bener-live-1jam.json",
+    ]
+    for p in candidates:
+        if p.exists():
+            return load_clock(p)
+    raise FileNotFoundError("clock-pagi-bener-live-1jam.json not found in expected locations")
+
+
 def load_persona(path: str | Path) -> PersonaCard:
     """Load and validate a persona card JSON file.
 

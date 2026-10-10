@@ -6,6 +6,10 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
+from unittest.mock import patch
+from app.tts.provider import MockTTSProvider
+
+
 class TestAPI(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
@@ -62,10 +66,11 @@ class TestAPI(unittest.TestCase):
         self.assertTrue(response.json()["valid"])
 
     def test_tts_endpoint(self):
-        response = self.client.post("/api/tts", json={"text": "Halo pendengar!", "voice": "male_voice"})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["content-type"], "audio/wav")
-        self.assertTrue(response.content.startswith(b"RIFF"))
+        with patch("app.main.tts_provider", MockTTSProvider()):
+            response = self.client.post("/api/tts", json={"text": "Halo pendengar!", "voice": "male_voice"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers["content-type"], "audio/wav")
+            self.assertTrue(response.content.startswith(b"RIFF"))
 
 
 if __name__ == "__main__":

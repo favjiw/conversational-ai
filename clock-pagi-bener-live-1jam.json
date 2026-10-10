@@ -1,0 +1,398 @@
+{
+  "show": "Pagi Bener (AI Live TikTok)",
+  "version": "0.1",
+  "source": "Format Clock Pagi Bener blok 07.00-08.00 (on-air HITS Unikom Radio), disesuaikan untuk AI Live TikTok 1 jam",
+  "duration_min": 60,
+  "time_signal_hour": 7,
+  "time_markers_min": [
+    15,
+    30,
+    45,
+    60
+  ],
+  "notes": [
+    "nominal_sec adalah durasi nominal dari clock asli: (n) = menit, ('n) = detik.",
+    "Durasi lagu aktual bervariasi; orchestrator wajib menyesuaikan agar tiba di time_marker (fade atau pemilihan lagu menurut durasi).",
+    "Fase 1 hanya menjalankan slot bertipe talk; slot lain dilewati.",
+    "Isi tema (tema.content) diisi dari PAGI_BENER.docx."
+  ],
+  "slots": [
+    {
+      "id": "s01",
+      "order": 1,
+      "type": "smash",
+      "label": "Smash Time Signal",
+      "nominal_sec": 9,
+      "source": "static_audio"
+    },
+    {
+      "id": "s02",
+      "order": 2,
+      "type": "time_signal",
+      "label": "Time Signal Jam 7",
+      "nominal_sec": 10,
+      "source": "static_audio",
+      "hour_param": "time_signal_hour"
+    },
+    {
+      "id": "s03",
+      "order": 3,
+      "type": "jingle",
+      "label": "Jingle Alamat HITS",
+      "nominal_sec": 13,
+      "source": "static_audio"
+    },
+    {
+      "id": "s04",
+      "order": 4,
+      "type": "psa",
+      "label": "P.S.A",
+      "nominal_sec": 60,
+      "source": "static_audio",
+      "note": "Sumber audio atau naskah PSA belum diketahui"
+    },
+    {
+      "id": "s05",
+      "order": 5,
+      "type": "greetings_artis",
+      "label": "Greetings Artis",
+      "nominal_sec": 20,
+      "source": "static_audio",
+      "optional": true,
+      "note": "Rekaman statis dari HITS; lewati jika berkas tidak tersedia"
+    },
+    {
+      "id": "s06",
+      "order": 6,
+      "type": "image_mashup",
+      "label": "Image / Mashup",
+      "nominal_sec": 32,
+      "source": "static_audio"
+    },
+    {
+      "id": "s07",
+      "order": 7,
+      "type": "song",
+      "label": "Lagu indo_hits",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo_hits"
+    },
+    {
+      "id": "s08",
+      "order": 8,
+      "type": "talk",
+      "label": "Talk 1 - HITS News",
+      "nominal_sec": 60,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Talk 1 - HITS News",
+        "mode": "scripted",
+        "role": "news",
+        "content": null,
+        "guidance": null
+      }
+    },
+    {
+      "id": "s09",
+      "order": 9,
+      "type": "song",
+      "label": "Lagu indo_hits",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo_hits"
+    },
+    {
+      "id": "s10",
+      "order": 10,
+      "type": "talk",
+      "label": "Talk 2 - Traffic Info",
+      "nominal_sec": 180,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Talk 2 - Traffic Info",
+        "mode": "scripted",
+        "role": "traffic",
+        "content": null,
+        "guidance": null
+      }
+    },
+    {
+      "id": "s11",
+      "order": 11,
+      "type": "song",
+      "label": "Lagu barat",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "barat"
+    },
+    {
+      "id": "s12",
+      "order": 12,
+      "type": "time_marker",
+      "label": "07.15",
+      "nominal_sec": 0,
+      "source": "none",
+      "target_min": 15
+    },
+    {
+      "id": "s13",
+      "order": 13,
+      "type": "smash_versi",
+      "label": "Smash Versi",
+      "nominal_sec": 5,
+      "source": "static_audio"
+    },
+    {
+      "id": "s14",
+      "order": 14,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s15",
+      "order": 15,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s16",
+      "order": 16,
+      "type": "jingle",
+      "label": "Jingle HITS",
+      "nominal_sec": 25,
+      "source": "static_audio"
+    },
+    {
+      "id": "s17",
+      "order": 17,
+      "type": "song",
+      "label": "Lagu indo",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo"
+    },
+    {
+      "id": "s18",
+      "order": 18,
+      "type": "song",
+      "label": "Lagu indo",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo"
+    },
+    {
+      "id": "s19",
+      "order": 19,
+      "type": "talk",
+      "label": "Talk 3 - Teaser 3M",
+      "nominal_sec": 180,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Talk 3 - Teaser 3M",
+        "mode": "listener_content",
+        "role": "teaser",
+        "content": null,
+        "guidance": null
+      }
+    },
+    {
+      "id": "s20",
+      "order": 20,
+      "type": "song",
+      "label": "Lagu barat",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "barat"
+    },
+    {
+      "id": "s21",
+      "order": 21,
+      "type": "time_marker",
+      "label": "07.30",
+      "nominal_sec": 0,
+      "source": "none",
+      "target_min": 30
+    },
+    {
+      "id": "s22",
+      "order": 22,
+      "type": "smash_versi",
+      "label": "Smash Versi",
+      "nominal_sec": 5,
+      "source": "static_audio"
+    },
+    {
+      "id": "s23",
+      "order": 23,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s24",
+      "order": 24,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s25",
+      "order": 25,
+      "type": "jingle",
+      "label": "Jingle HITS",
+      "nominal_sec": 25,
+      "source": "static_audio"
+    },
+    {
+      "id": "s26",
+      "order": 26,
+      "type": "song",
+      "label": "Lagu indo",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo"
+    },
+    {
+      "id": "s27",
+      "order": 27,
+      "type": "song",
+      "label": "Lagu korea",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "korea"
+    },
+    {
+      "id": "s28",
+      "order": 28,
+      "type": "talk",
+      "label": "Talk 4 - 3M",
+      "nominal_sec": 180,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Talk 4 - 3M",
+        "mode": "listener_content",
+        "role": "3m",
+        "content": null,
+        "guidance": null
+      }
+    },
+    {
+      "id": "s29",
+      "order": 29,
+      "type": "song",
+      "label": "Lagu indo",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo"
+    },
+    {
+      "id": "s30",
+      "order": 30,
+      "type": "time_marker",
+      "label": "07.45",
+      "nominal_sec": 0,
+      "source": "none",
+      "target_min": 45
+    },
+    {
+      "id": "s31",
+      "order": 31,
+      "type": "smash_versi",
+      "label": "Smash Versi",
+      "nominal_sec": 5,
+      "source": "static_audio"
+    },
+    {
+      "id": "s32",
+      "order": 32,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s33",
+      "order": 33,
+      "type": "spot_adlibs",
+      "label": "Spot/Adlibs",
+      "nominal_sec": 60,
+      "source": "tts"
+    },
+    {
+      "id": "s34",
+      "order": 34,
+      "type": "jingle",
+      "label": "Jingle HITS",
+      "nominal_sec": 25,
+      "source": "static_audio"
+    },
+    {
+      "id": "s35",
+      "order": 35,
+      "type": "song",
+      "label": "Lagu barat",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "barat"
+    },
+    {
+      "id": "s36",
+      "order": 36,
+      "type": "talk",
+      "label": "Talk 5 - 3M",
+      "nominal_sec": 180,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Talk 5 - 3M",
+        "mode": "listener_content",
+        "role": "3m",
+        "content": null,
+        "guidance": null
+      }
+    },
+    {
+      "id": "s37",
+      "order": 37,
+      "type": "song",
+      "label": "Lagu indo",
+      "nominal_sec": 180,
+      "source": "music_api",
+      "category": "indo"
+    },
+    {
+      "id": "s38",
+      "order": 38,
+      "type": "talk",
+      "label": "Closing + Selling Next Live",
+      "nominal_sec": 180,
+      "source": "llm_conversation",
+      "tema": {
+        "title": "Closing + Selling Next Live",
+        "mode": "improv",
+        "role": "closing",
+        "content": null,
+        "guidance": null
+      },
+      "adapted": true,
+      "note": "Asli: 'Selling Next Hour'. Pada live 1 jam tidak ada jam berikutnya, jadi diubah menjadi penutup dan promosi live berikutnya"
+    },
+    {
+      "id": "s39",
+      "order": 39,
+      "type": "jingle",
+      "label": "Jingle Alamat HITS (outro)",
+      "nominal_sec": 13,
+      "source": "static_audio",
+      "adapted": true,
+      "optional": true,
+      "note": "Tambahan: penutup siaran. Lagu terakhir pada clock asli dihapus karena tidak ada jam berikutnya"
+    }
+  ]
+}

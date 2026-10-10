@@ -327,32 +327,64 @@ class EdgeTTSProvider(TTSProvider):
     """Microsoft Edge TTS provider using edge-tts (free, neural, unlimited)."""
 
     DEFAULT_VOICE_MALE = "id-ID-ArdiNeural"
-    DEFAULT_VOICE_FEMALE = "id-ID-GadisNeural"
+    DEFAULT_VOICE_FEMALE = "su-ID-TutiNeural"
 
     def __init__(
         self,
         default_male: str = "id-ID-ArdiNeural",
-        default_female: str = "id-ID-GadisNeural",
+        default_female: str = "su-ID-TutiNeural",
+        female_rate: str = "+18%",
+        female_pitch: str = "+1Hz",
+        male_rate: str = "+0%",
+        male_pitch: str = "+0Hz",
+        elevenlabs_fallback_key: str = "",
+        elevenlabs_fallback_model: str = "eleven_flash_v2_5",
     ):
         self._default_male = default_male
         self._default_female = default_female
+        self._female_rate = female_rate
+        self._female_pitch = female_pitch
+        self._male_rate = male_rate
+        self._male_pitch = male_pitch
+        self._elevenlabs_key = elevenlabs_fallback_key
+        self._elevenlabs_model = elevenlabs_fallback_model
 
     async def synthesize(self, text: str, voice: str) -> bytes:
         import edge_tts
 
-        voice_id = voice
-        if not voice_id or voice_id in ("male_voice", "male", "persona_a"):
+        voice_id = (voice or "").strip()
+        is_female = False
+
+        # Support direct ElevenLabs voice ID if user configures one
+        if len(voice_id) >= 18 and voice_id.isalnum() and "-" not in voice_id and self._elevenlabs_key:
+            try:
+                el_provider = ElevenLabsTTSProvider(api_key=self._elevenlabs_key, model_id=self._elevenlabs_model)
+                return await el_provider.synthesize(text, voice_id)
+            except Exception as e:
+                logger.warning("ElevenLabs fallback failed for voice '%s', falling back to Edge TTS: %s", voice_id, e)
+
+        if not voice_id or voice_id in ("male_voice", "male", "persona_a", "raka"):
             voice_id = self._default_male
-        elif voice_id in ("female_voice", "female", "persona_b"):
+        elif voice_id in ("female_voice", "female", "persona_b", "salsa"):
             voice_id = self._default_female
-        elif not voice_id.startswith("id-"):
-            if any(k in voice_id.lower() for k in ("salsa", "female", "exav", "kore", "gadis")):
+            is_female = True
+        elif any(k in voice_id.lower() for k in ("salsa", "female", "gadis", "tuti", "siti", "yasmin", "exav", "kore", "sarah")):
+            is_female = True
+            # If not an explicit Edge TTS voice model tag (e.g. su-ID-TutiNeural), default to female
+            if not ("-" in voice_id and "Neural" in voice_id):
                 voice_id = self._default_female
-            else:
-                voice_id = self._default_male
+        elif not ("-" in voice_id and "Neural" in voice_id):
+            voice_id = self._default_male
+
+        # Check gender by voice identifier if not already flagged
+        if any(female_kw in voice_id.lower() for female_kw in ("tuti", "gadis", "siti", "yasmin", "female")):
+            is_female = True
+
+        rate = self._female_rate if is_female else self._male_rate
+        pitch = self._female_pitch if is_female else self._male_pitch
 
         cleaned_text = text.replace("//", "... ").replace("/", ", ")
-        communicate = edge_tts.Communicate(cleaned_text, voice_id)
+        communicate = edge_tts.Communicate(cleaned_text, voice_id, rate=rate, pitch=pitch)
         data = bytearray()
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
@@ -366,6 +398,66 @@ class EdgeTTSProvider(TTSProvider):
     def provider_name(self) -> str:
         return "edge"
 
+
+
+class VoiceStudioTTSProvider(TTSProvider):
+    """VoiceStudio local TTS provider using OpenAI-compatible HTTP endpoint.
+
+    Connects to VoiceStudio server running on localhost (default :3900).
+    Endpoint: POST /v1/audio/speech
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:3900",
+        api_key: str = "",
+        model: str = "tts-1",
+        timeout_s: float = 60.0,
+    ):
+        self._base_url = base_url.rstrip("/")
+        self._api_key = api_key
+        self._model = model
+        self._timeout_s = timeout_s
+
+    async def synthesize(self, text: str, voice: str) -> bytes:
+        import httpx
+
+        cleaned_text = text.replace("//", "... ").replace("/", ", ")
+        voice_id = voice if voice else "default"
+
+        payload = {
+            "model": self._model,
+            "input": cleaned_text,
+            "voice": voice_id,
+            "response_format": "wav",
+        }
+
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+
+        url = f"{self._base_url}/v1/audio/speech"
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_s) as client:
+                res = await client.post(url, json=payload, headers=headers)
+                if res.status_code != 200:
+                    raise RuntimeError(
+                        f"VoiceStudio TTS error {res.status_code}: {res.text}"
+                    )
+                audio_bytes = res.content
+                if not audio_bytes:
+                    raise RuntimeError("VoiceStudio returned empty audio")
+                return audio_bytes
+        except httpx.ConnectError as e:
+            raise ConnectionError(
+                f"Cannot connect to VoiceStudio at {self._base_url}. "
+                f"Ensure VoiceStudio is running: {e}"
+            ) from e
+
+    @property
+    def provider_name(self) -> str:
+        return "voicestudio"
 
 # ── Cached TTS wrapper ──────────────────────────────────────────────────────
 
@@ -402,17 +494,35 @@ def create_tts_provider(
     cache_dir: str = "cache/tts",
     enable_cache: bool = True,
     elevenlabs_model: str = "eleven_flash_v2_5",
+    voicestudio_url: str = "http://127.0.0.1:3900",
+    voicestudio_api_key: str = "",
+    voicestudio_model: str = "tts-1",
+    edge_voice_male: str = "id-ID-ArdiNeural",
+    edge_voice_female: str = "su-ID-TutiNeural",
+    edge_rate_female: str = "+18%",
+    edge_pitch_female: str = "+1Hz",
+    edge_rate_male: str = "+0%",
+    edge_pitch_male: str = "+0Hz",
 ) -> TTSProvider:
     """Create TTS provider based on config.
 
     Args:
         mode: "live" or "mock".
-        provider: "gemini" or "elevenlabs".
+        provider: "gemini", "elevenlabs", "edge", or "voicestudio".
         api_key: API key for the provider.
         model: Model ID for Gemini TTS.
         cache_dir: Directory for audio cache.
         enable_cache: Whether to wrap in cache layer.
         elevenlabs_model: Model ID for ElevenLabs TTS.
+        voicestudio_url: Base URL of local VoiceStudio server.
+        voicestudio_api_key: Optional Bearer token for VoiceStudio.
+        voicestudio_model: Model/engine identifier for VoiceStudio.
+        edge_voice_male: Voice identifier for Edge TTS male speaker.
+        edge_voice_female: Voice identifier for Edge TTS female speaker.
+        edge_rate_female: Rate modifier for Edge TTS female speaker.
+        edge_pitch_female: Pitch modifier for Edge TTS female speaker.
+        edge_rate_male: Rate modifier for Edge TTS male speaker.
+        edge_pitch_male: Pitch modifier for Edge TTS male speaker.
 
     Returns:
         A TTSProvider instance.
@@ -428,7 +538,22 @@ def create_tts_provider(
             raise ValueError("ELEVENLABS_API_KEY required when TTS_PROVIDER=elevenlabs")
         inner = ElevenLabsTTSProvider(api_key=api_key, model_id=elevenlabs_model)
     elif provider in ("edge", "edge_tts", "edge-tts"):
-        inner = EdgeTTSProvider()
+        inner = EdgeTTSProvider(
+            default_male=edge_voice_male,
+            default_female=edge_voice_female,
+            female_rate=edge_rate_female,
+            female_pitch=edge_pitch_female,
+            male_rate=edge_rate_male,
+            male_pitch=edge_pitch_male,
+            elevenlabs_fallback_key=api_key or "",
+            elevenlabs_fallback_model=elevenlabs_model,
+        )
+    elif provider in ("voicestudio", "voice_studio", "omni", "omnivoice"):
+        inner = VoiceStudioTTSProvider(
+            base_url=voicestudio_url,
+            api_key=voicestudio_api_key,
+            model=voicestudio_model,
+        )
     else:
         raise ValueError(f"Unknown TTS provider: {provider}")
 

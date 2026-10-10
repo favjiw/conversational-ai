@@ -103,8 +103,11 @@ export default function TTSLab() {
                 onChange={(e) => setSelectedVoice(e.target.value)}
                 style={{ width: '220px' }}
               >
-                <option value="male_voice">Pria (Raka) - Indonesian</option>
-                <option value="female_voice">Wanita (Sari) - Indonesian</option>
+                <option value="male_voice">Pria (Raka) - id-ID-ArdiNeural</option>
+                <option value="female_voice">Wanita (Salsa) - Default Voice</option>
+                <option value="su-ID-TutiNeural">Wanita (Salsa Bandung) - su-ID-TutiNeural</option>
+                <option value="id-ID-GadisNeural">Wanita (Salsa Nasional) - id-ID-GadisNeural (+18%)</option>
+                <option value="EXAVITQu4vr4xnSDxMaL">Wanita (Salsa ElevenLabs Sarah) - Ultra Natural</option>
               </select>
             </div>
           </div>

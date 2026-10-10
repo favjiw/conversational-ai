@@ -18,6 +18,7 @@ from app.schemas import (
     ModelsUsed,
     PersonaCard,
     PersonaOutput,
+    SupervisorVerdict,
     Tema,
     TurnLog,
 )
@@ -60,7 +61,10 @@ def build_persona_system_prompt(persona: PersonaCard) -> str:
     lines.append(
         "Balas dalam bahasa Indonesia santai, seolah sedang live radio. "
         "Gunakan tanda / untuk jeda pendek dan // untuk jeda panjang. "
-        "Jangan terlalu panjang, 2-4 kalimat saja per giliran."
+        "Jangan terlalu panjang, 2-4 kalimat saja per giliran. "
+        "ATURAN KETAT: DILARANG KERAS menggunakan emoji atau simbol apapun (seperti ⚡, 🎵, 🎙️, 🔥, 😊). "
+        "DILARANG menuliskan keterangan panggung atau tindakan dalam tanda kurung seperti (tertawa), (senyum). "
+        "Hanya hasilkan teks tutur lisan murni yang diucapkan lewat mikrofon."
     )
     lines.append(
         'Balas HANYA dalam format JSON: {"text": "...", "emotion": "..."}'
@@ -159,6 +163,7 @@ class ConversationEngine:
         theme_playlist: Optional[list[Tema]] = None,
         turns_per_theme: int = 6,
         on_theme_change=None,
+        on_turn=None,
     ) -> list[TurnLog]:
         """Run a full Talk slot conversation.
 
@@ -235,8 +240,9 @@ class ConversationEngine:
                 self.logger.log_turn(turn_log)
 
             # Notify callback
-            if self.on_turn:
-                await self.on_turn(turn_log)
+            cb = on_turn or self.on_turn
+            if cb:
+                await cb(turn_log)
 
         logger.info(
             "Completed slot %s: %d turns", slot_id, len(turn_logs)
@@ -282,6 +288,23 @@ class ConversationEngine:
             {"name": active_persona.name, "text": final_text}
         )
 
+        # ── Supervisor check for Condition C ────────────────────────────
+        verdict = None
+        supervisor_model = ""
+        if self.condition == ExperimentCondition.C and self.supervisor_client:
+            sup_start = time.perf_counter()
+            sup_prompt = f"Evaluasi drift persona {active_persona.name}: {final_text}"
+            sup_res = await self.supervisor_client.generate(
+                sup_prompt,
+                response_schema=SupervisorVerdict,
+            )
+            latency.supervisor = int((time.perf_counter() - sup_start) * 1000)
+            supervisor_model = sup_res.model
+            try:
+                verdict = SupervisorVerdict.model_validate(sup_res.parsed)
+            except Exception:
+                verdict = SupervisorVerdict(drift_detected=False)
+
         # ── Build turn log ───────────────────────────────────────────────
         turn_log = TurnLog(
             session_id=self.session_id,
@@ -290,14 +313,14 @@ class ConversationEngine:
             turn=turn,
             persona=active_persona.id,
             raw_reply=raw_reply,
-            verdict=None,
+            verdict=verdict,
             regenerations=0,
             final_text=final_text,
             emotion=emotion,
             latency_ms=latency,
             models=ModelsUsed(
                 persona=persona_response.model,
-                supervisor="",
+                supervisor=supervisor_model,
             ),
         )
 

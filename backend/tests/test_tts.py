@@ -4,7 +4,14 @@ import unittest
 from pathlib import Path
 import tempfile
 
-from app.tts.provider import MockTTSProvider, AudioCache, split_on_pauses
+from unittest.mock import AsyncMock, patch, MagicMock
+from app.tts.provider import (
+    MockTTSProvider,
+    AudioCache,
+    split_on_pauses,
+    VoiceStudioTTSProvider,
+    create_tts_provider,
+)
 
 
 class TestTTS(unittest.IsolatedAsyncioTestCase):
@@ -47,6 +54,39 @@ class TestTTS(unittest.IsolatedAsyncioTestCase):
             # Cache hit
             cached = cache.get(text, voice, provider)
             self.assertEqual(cached, fake_audio)
+
+    async def test_voicestudio_tts_synthesize_mock_http(self):
+        provider = VoiceStudioTTSProvider(
+            base_url="http://127.0.0.1:3900",
+            api_key="test_key",
+            model="tts-1",
+        )
+        fake_wav = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00"
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.content = fake_wav
+
+        with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = mock_response
+            audio = await provider.synthesize("Halo / dunia", "female_voice")
+            self.assertEqual(audio, fake_wav)
+            mock_post.assert_called_once()
+            call_kwargs = mock_post.call_args.kwargs
+            self.assertEqual(call_kwargs["json"]["voice"], "female_voice")
+            self.assertEqual(call_kwargs["json"]["input"], "Halo ,  dunia")
+            self.assertEqual(call_kwargs["headers"]["Authorization"], "Bearer test_key")
+
+    def test_create_tts_provider_voicestudio(self):
+        p = create_tts_provider(
+            mode="live",
+            provider="voicestudio",
+            voicestudio_url="http://localhost:3900",
+            voicestudio_model="tts-1",
+            enable_cache=False,
+        )
+        self.assertIsInstance(p, VoiceStudioTTSProvider)
+        self.assertEqual(p.provider_name, "voicestudio")
 
 
 if __name__ == "__main__":

@@ -108,6 +108,7 @@ class MockLLMClient(LLMClient):
         # Simulate a small delay
         await asyncio.sleep(0.05)
         start = time.perf_counter()
+        raw = None
 
         if response_schema is PersonaOutput:
             # Alternate between two mock responses
@@ -148,6 +149,9 @@ class MockLLMClient(LLMClient):
         else:
             # Generic mock
             parsed = {"text": f"[Mock response {self._call_count}]"}
+            raw = json.dumps(parsed, ensure_ascii=False)
+
+        if not raw:
             raw = json.dumps(parsed, ensure_ascii=False)
         latency_ms = int((time.perf_counter() - start) * 1000)
 

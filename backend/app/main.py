@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -37,6 +37,10 @@ from app.schemas import (
 )
 from app.session_logging.logger import SessionLogger
 from app.tts.provider import create_tts_provider
+from app.music.provider import create_music_provider
+from app.music.models import MusicTrack
+from app.clock.validator import validate_clock_semantics
+from app.orchestrator.clock_runner import clean_text_for_tts
 
 # Logging configuration
 logging.basicConfig(
@@ -107,6 +111,20 @@ tts_provider = create_tts_provider(
     api_key=settings.ELEVENLABS_API_KEY if settings.TTS_PROVIDER == "elevenlabs" else settings.GEMINI_API_KEY,
     model=settings.GEMINI_MODEL_TTS,
     elevenlabs_model=settings.ELEVENLABS_MODEL_ID,
+    voicestudio_url=settings.VOICESTUDIO_URL,
+    voicestudio_api_key=settings.VOICESTUDIO_API_KEY,
+    voicestudio_model=settings.VOICESTUDIO_MODEL,
+    edge_voice_male=settings.EDGE_VOICE_MALE,
+    edge_voice_female=settings.EDGE_VOICE_FEMALE,
+    edge_rate_female=settings.EDGE_RATE_FEMALE,
+    edge_pitch_female=settings.EDGE_PITCH_FEMALE,
+    edge_rate_male=settings.EDGE_RATE_MALE,
+    edge_pitch_male=settings.EDGE_PITCH_MALE,
+)
+
+music_provider = create_music_provider(
+    provider=settings.MUSIC_PROVIDER,
+    fail_inject=settings.FAIL_INJECT,
 )
 
 current_engine: Optional[ConversationEngine] = None
@@ -148,6 +166,46 @@ def serve_audio(filename: str):
         raise HTTPException(status_code=404, detail="Audio file not found")
     media_type = "audio/mpeg" if filename.endswith(".mp3") else "audio/wav"
     return FileResponse(path=str(file_path), media_type=media_type)
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = "male_voice"
+
+
+@app.post("/api/tts")
+async def synthesize_tts(req: TTSRequest):
+    """Direct TTS endpoint for TTSLab and real-time audio testing."""
+    try:
+        audio_bytes = await tts_provider.synthesize(req.text, req.voice or "male_voice")
+        media_type = "audio/wav" if audio_bytes.startswith(b"RIFF") else ("audio/mpeg" if settings.TTS_PROVIDER in ("elevenlabs", "edge") else "audio/wav")
+        return Response(content=audio_bytes, media_type=media_type)
+    except Exception as e:
+        logger.error("TTS synthesize failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/music/search")
+async def search_music(category: str = "", query: str = "", limit: int = 5):
+    """Search music tracks via the configured MusicProvider.
+    
+    Args:
+        category: Clock slot category (indo_hits, indo, barat, korea).
+        query: Free-text search query (overrides category).
+        limit: Max results (default 5).
+    
+    Returns:
+        List of MusicTrack with preview_url populated.
+    """
+    try:
+        tracks = await music_provider.search(
+            category=category, query=query, limit=limit
+        )
+        return {"tracks": [t.model_dump() for t in tracks]}
+    except Exception as e:
+        logger.error("Music search failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 def load_aron_themes() -> list[Tema]:
     themes_path = Path(__file__).parent / "data" / "aron_themes_id.json"
@@ -297,8 +355,11 @@ async def start_session(req: StartSessionRequest):
                 voice = "Puck" if active_persona.gender == "male" else "Kore"
 
             logger.info("Synthesizing TTS (%s) for turn %d (%s, voice=%s)...", settings.TTS_PROVIDER, turn_log.turn, active_persona.name, voice)
+            spoken_text = clean_text_for_tts(turn_log.final_text)
+            if not spoken_text:
+                spoken_text = turn_log.final_text
             audio_bytes = await tts_provider.synthesize(
-                text=turn_log.final_text,
+                text=spoken_text,
                 voice=voice,
             )
             cache_dir = Path("cache/tts")
@@ -391,6 +452,139 @@ async def stop_session():
     await on_session_status(SessionState.IDLE)
     return {"status": "stopped", "session_id": current_session_id}
 
+
+# ── Clock Rundown (Pagi Bener 1-Jam) Endpoints ──────────────────────────────
+
+from app.clock.parser import load_pagi_bener_clock
+from app.orchestrator.clock_runner import ClockRunner
+
+clock_runner_instance: Optional[ClockRunner] = None
+clock_runner_task: Optional[asyncio.Task] = None
+
+@app.get("/api/clock")
+def get_default_clock():
+    """Return default loaded clock template."""
+    clock = load_pagi_bener_clock()
+    data = clock.model_dump()
+    data["show"] = "Pagi Bener"
+    return data
+
+@app.get("/api/personas")
+def get_personas():
+    """Return default personas."""
+    return {
+        "persona_a": {
+            "id": "persona_a",
+            "name": "Raka",
+            "gender": "male",
+            "voice": settings.EDGE_VOICE_MALE,
+        },
+        "persona_b": {
+            "id": "persona_b",
+            "name": "Salsa",
+            "gender": "female",
+            "voice": settings.EDGE_VOICE_FEMALE,
+        },
+    }
+
+class ValidateClockRequest(BaseModel):
+    clock: dict[str, Any]
+
+@app.post("/api/clock/validate")
+def validate_clock_endpoint(req: ValidateClockRequest):
+    try:
+        from app.schemas import Clock
+        clock = Clock.model_validate(req.clock)
+        issues = validate_clock_semantics(clock)
+        return {"valid": len(issues) == 0, "issues": issues}
+    except Exception as e:
+        return {"valid": False, "issues": [str(e)]}
+
+@app.get("/api/clock/pagi-bener")
+def get_pagi_bener_clock():
+    """Return the loaded 39-slot Pagi Bener clock template."""
+    clock = load_pagi_bener_clock()
+    return clock.model_dump()
+
+class StartClockRequest(BaseModel):
+    demo_music_sec: Optional[int] = 30
+    talk_turns_per_slot: Optional[int] = 2
+
+@app.post("/api/clock/start")
+async def start_clock_session(req: StartClockRequest = StartClockRequest()):
+    global clock_runner_instance, clock_runner_task, current_session_id
+    if clock_runner_task and not clock_runner_task.done():
+        raise HTTPException(status_code=400, detail="Clock session is already running")
+
+    clock = load_pagi_bener_clock()
+    session_id = f"clock_{uuid.uuid4().hex[:8]}"
+    current_session_id = session_id
+
+    voice_a = settings.EDGE_VOICE_MALE if settings.TTS_PROVIDER == "edge" else (settings.ELEVENLABS_VOICE_A or "JBFqnCBsd6RMkjVDRZzb")
+    voice_b = settings.EDGE_VOICE_FEMALE if settings.TTS_PROVIDER == "edge" else (settings.ELEVENLABS_VOICE_B or "EXAVITQu4vr4xnSDxMaL")
+
+    persona_a = PersonaCard(
+        id="persona_a",
+        name="Raka",
+        gender="male",
+        voice=voice_a,
+        speaking_style="Pria ceria, lugas, santai, energi tinggi",
+        catchphrases=["Stay tuned bareng kita!", "Gimana nih menurut lo?"],
+        topic_limits=["Kultur pop", "Gaya hidup", "Musik", "Kota"],
+        background_facts=["Penyiar radio muda Bandung", "Suka kopi dan kuliner"],
+        do_not=["Jangan gunakan bahasa kaku"],
+    )
+
+    persona_b = PersonaCard(
+        id="persona_b",
+        name="Salsa",
+        gender="female",
+        voice=voice_b,
+        speaking_style="Wanita hangat, tanggap, ramah, humoris",
+        catchphrases=["Bener banget!", "Wah seru tuh!"],
+        topic_limits=["Kultur pop", "Gaya hidup", "Musik", "Kota"],
+        background_facts=["Penyiar radio hits Bandung", "Suka nonton konser"],
+        do_not=["Jangan gunakan bahasa kaku"],
+    )
+
+    async def broadcast_clock_event(event: dict[str, Any]):
+        await ws_manager.broadcast_json(event)
+
+    clock_runner_instance = ClockRunner(
+        clock=clock,
+        persona_a=persona_a,
+        persona_b=persona_b,
+        llm_client=llm_client,
+        tts_provider=tts_provider,
+        music_provider=music_provider,
+        broadcast_fn=broadcast_clock_event,
+        demo_music_sec=req.demo_music_sec or 30,
+        talk_turns_per_slot=req.talk_turns_per_slot or 2,
+    )
+
+    await clock_runner_instance.start(session_id)
+    clock_runner_task = clock_runner_instance._run_task
+    return {"status": "started", "session_id": session_id, "total_slots": len(clock.slots)}
+
+@app.post("/api/clock/stop")
+async def stop_clock_session():
+    global clock_runner_instance
+    if clock_runner_instance:
+        await clock_runner_instance.stop()
+    return {"status": "stopped"}
+
+@app.post("/api/clock/next")
+async def skip_clock_slot():
+    global clock_runner_instance
+    if not clock_runner_instance:
+        raise HTTPException(status_code=404, detail="No active clock session")
+    if clock_runner_instance.state != SessionState.RUNNING:
+        raise HTTPException(status_code=400, detail="Clock not running")
+    
+    next_index = clock_runner_instance._current_slot_idx + 1
+    await clock_runner_instance.skip_to_next()
+    return {"status": "skipped", "next_slot_index": next_index}
+
 @app.get("/api/session/status")
 def get_session_status():
     return SessionStatus(
@@ -433,7 +627,12 @@ async def websocket_session_endpoint(websocket: WebSocket):
                 cmd = json.loads(data)
                 if cmd.get("action") == "ping":
                     await websocket.send_json({"type": "pong"})
-            except Exception:
-                pass
+                elif cmd.get("action") == "playback_feedback":
+                    # Forward playback feedback to ClockRunner
+                    global clock_runner_instance
+                    if clock_runner_instance:
+                        clock_runner_instance.playback_feedback(cmd.get("data", {}))
+            except Exception as e:
+                logger.warning("WS command error: %s", e)
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)

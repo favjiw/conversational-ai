@@ -14,22 +14,27 @@ these models.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ── Enums ────────────────────────────────────────────────────────────────────
 
 class SlotType(str, Enum):
+    SMASH = "smash"
     TIME_SIGNAL = "time_signal"
     JINGLE = "jingle"
     PSA = "psa"
     GREETINGS_ARTIS = "greetings_artis"
+    IMAGE_MASHUP = "image_mashup"
+    SMASH_VERSI = "smash_versi"
+    SONG = "song"
     SONG_BLOCK = "song_block"
     SPOT_ADLIBS = "spot_adlibs"
     ICE_BREAKING = "ice_breaking"
     TALK = "talk"
+    TIME_MARKER = "time_marker"
     SELLING_NEXT_HOUR = "selling_next_hour"
 
 
@@ -37,6 +42,8 @@ class SlotSource(str, Enum):
     STATIC_AUDIO = "static_audio"
     TTS = "tts"
     MUSIC_API = "music_api"
+    LLM_CONVERSATION = "llm_conversation"
+    NONE = "none"
 
 
 class TemaMode(str, Enum):
@@ -96,11 +103,27 @@ class Slot(BaseModel):
     id: str
     order: int
     type: SlotType
-    duration_sec: int
+    duration_sec: int = 0
+    nominal_sec: Optional[int] = None
+    label: Optional[str] = None
+    category: Optional[str] = None
     source: Optional[SlotSource] = None
     asset: Optional[str] = None
     tts_text: Optional[str] = None
     tema: Optional[Tema] = None
+    optional: Optional[bool] = False
+    note: Optional[str] = None
+    target_min: Optional[int] = None
+    hour_param: Optional[str] = None
+    adapted: Optional[bool] = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_duration(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "duration_sec" not in data or data["duration_sec"] is None:
+                data["duration_sec"] = data.get("nominal_sec", 0)
+        return data
 
 
 class Clock(BaseModel):

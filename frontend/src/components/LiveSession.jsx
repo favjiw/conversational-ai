@@ -3,6 +3,8 @@ import Header from './Header';
 import SessionConfig from './SessionConfig';
 import SpeakerCards from './SpeakerCards';
 import TranscriptCard from './TranscriptCard';
+import ClockRundownTimeline from './ClockRundownTimeline';
+import NowPlayingMusic from './NowPlayingMusic';
 import Footer from './Footer';
 import { useLiveSession } from '../hooks/useLiveSession';
 
@@ -29,6 +31,13 @@ export default function LiveSession() {
     maxTurns,
     setMaxTurns,
     currentTheme,
+    clockSlots,
+    currentSlot,
+    musicTrack,
+    isSkipping,
+    playbackState,
+    slotElapsedSec,
+    handleSkipNext,
   } = useLiveSession();
 
   return (
@@ -55,6 +64,24 @@ export default function LiveSession() {
             setMaxTurns={setMaxTurns}
             currentTheme={currentTheme}
           />
+
+          {/* Clock Rundown Banner Timeline (when in clock preset or running clock) */}
+          {(preset === 'clock_pagi_bener' || currentSlot) && (
+            <ClockRundownTimeline
+              slots={clockSlots}
+              currentSlot={currentSlot}
+              isRunning={isRunning}
+              isSkipping={isSkipping}
+              playbackState={playbackState}
+              slotElapsedSec={slotElapsedSec}
+              handleSkipNext={handleSkipNext}
+            />
+          )}
+
+          {/* Deezer Music Preview Player (when song slot is active) */}
+          {musicTrack && (
+            <NowPlayingMusic musicTrack={musicTrack} playbackState={playbackState} slotElapsedSec={slotElapsedSec} />
+          )}
 
           <SpeakerCards
             personaA={personaA}
