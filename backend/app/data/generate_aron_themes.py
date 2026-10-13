@@ -42,6 +42,16 @@ id_translations = [
     ("Curhat Masalah dan Minta Masukan", "Curhatin satu kegelisahan atau masalah lo saat ini, dan minta saran tulus dari rekan lo.")
 ]
 
+# Themes flagged sensitive (PRD v1.1 FR-8): #7, #18, #19, #24, #33, #35
+SENSITIVE_IDS = {7, 18, 19, 24, 33, 35}
+
+GUIDANCE_V2_TEMPLATE = (
+    "Jadikan pertanyaan ini bahan obrolan santai, bukan kuis. "
+    "Jawab dengan pengalaman atau pendapat spesifik milikmu. "
+    "Boleh tidak setuju atau menggoda partner. "
+    "Jangan memuji pertanyaan atau mengulang ucapan partner."
+)
+
 enriched = []
 for item, (title_id, text_id) in zip(raw_themes, id_translations):
     set_num = item.get("set", "I")
@@ -57,7 +67,9 @@ for item, (title_id, text_id) in zip(raw_themes, id_translations):
         "title": f"#{item['id']} {title_id}",
         "question_id": text_id,
         "question_en": item["text"],
-        "guidance": f"Bahas santai dan seru: '{text_id}'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits."
+        "guidance": f"Bahas santai dan seru: '{text_id}'. Dengarkan rekanmu, beri tanggapan hangat, dan selipkan guyonan khas siaran radio hits.",
+        "guidance_v2": GUIDANCE_V2_TEMPLATE,
+        "sensitive": item["id"] in SENSITIVE_IDS,
     })
 
 out_path = Path(__file__).parent.joinpath("aron_themes_id.json")

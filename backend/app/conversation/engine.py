@@ -1,23 +1,34 @@
 """Conversation engine — HITS AI Live (Condition A).
 
 Two LLMs talk directly, no supervisor.
+
+PRD v1.1 (Naturalness Percakapan) adds, on top of the frozen ``baseline_v1``
+profile, a ``natural_v2`` profile with:
+- a dialog-act sampler (FR-4)
+- a catchphrase scheduler (FR-3)
+- session context injection (FR-7)
+- a lexical anti-repetition guard (FR-5)
 """
 
 from __future__ import annotations
 
 import logging
+import random
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from app.llm.client import LLMClient, LLMResponse
 from app.schemas import (
+    DialogAct,
     Emotion,
     ExperimentCondition,
     LatencyMs,
     ModelsUsed,
     PersonaCard,
     PersonaOutput,
+    PromptProfile,
     SupervisorVerdict,
     Tema,
     TurnLog,
@@ -26,12 +37,57 @@ from app.session_logging.logger import SessionLogger
 
 logger = logging.getLogger(__name__)
 
+# Catchphrase scheduler probabilities (FR-3)
+CATCHPHRASE_PROBABILITY = 1.0 / 6.0
+CATCHPHRASE_COOLDOWN_TURNS = 6
+
+# Dialog act list and anti-repetition window (FR-4, FR-5)
+DIALOG_ACTS = [
+    DialogAct.ANECDOTE,
+    DialogAct.OPINION_DIFF,
+    DialogAct.NEW_FACT,
+    DialogAct.PERSONAL_QUESTION,
+    DialogAct.TEASE,
+    DialogAct.SHORT_REACT,
+    DialogAct.TRANSITION,
+]
+
+DIALOG_ACT_HINTS = {
+    DialogAct.ANECDOTE: "ceritakan pengalaman atau anekdot spesifik milikmu",
+    DialogAct.OPINION_DIFF: "sampaikan pendapat yang berbeda dari partner beserta alasannya",
+    DialogAct.NEW_FACT: "tambahkan satu fakta atau detail baru ke obrolan",
+    DialogAct.PERSONAL_QUESTION: "tanyakan hal personal yang ringan ke partner",
+    DialogAct.TEASE: "goda partner secara ringan dan ramah",
+    DialogAct.SHORT_REACT: "beri reaksi singkat satu kalimat",
+    DialogAct.TRANSITION: "pindahkan obrolan ke sub-topik yang masih berkaitan",
+    DialogAct.WRAP_UP: "tutup tema; ini satu-satunya giliran yang boleh menyapa pendengar",
+}
+
+ANTI_REPETITION_WINDOW = 6
+TRIGRAM_REPEAT_LIMIT = 3
+TRIGRAM_HISTORY_WINDOW = 10
+MAX_GUARD_REGENERATIONS = 1
+
 
 # ── Prompt builders ──────────────────────────────────────────────────────────
 
 
-def build_persona_system_prompt(persona: PersonaCard) -> str:
-    """Build the system instruction for a persona LLM call."""
+def build_persona_system_prompt(
+    persona: PersonaCard,
+    profile: PromptProfile = PromptProfile.BASELINE_V1,
+) -> str:
+    """Build the system instruction for a persona LLM call.
+
+    ``baseline_v1`` reproduces the pre-v1.1 prompt byte-for-byte.
+    ``natural_v2`` removes the catchphrase list, reinterprets topic_limits as
+    "avoid" topics, and relaxes the "only these facts" rule (FR-3, FR-6).
+    """
+    if profile == PromptProfile.BASELINE_V1:
+        return _build_baseline_system_prompt(persona)
+    return _build_natural_system_prompt(persona)
+
+
+def _build_baseline_system_prompt(persona: PersonaCard) -> str:
     lines = [
         f"Kamu adalah {persona.name}, seorang penyiar AI radio.",
         f"Gender: {persona.gender}.",
@@ -76,15 +132,108 @@ def build_persona_system_prompt(persona: PersonaCard) -> str:
     return "\n".join(lines)
 
 
+def _build_natural_system_prompt(persona: PersonaCard) -> str:
+    lines = [
+        f"Kamu adalah {persona.name}, seorang penyiar AI radio.",
+        f"Gender: {persona.gender}.",
+        f"Gaya bicara: {persona.speaking_style}",
+        "",
+        "Fakta inti tentang dirimu:",
+    ]
+    for fact in persona.background_facts:
+        lines.append(f"- {fact}")
+
+    if persona.opinions:
+        lines.append("")
+        lines.append("Pendapat dan seleramu (boleh kamu pegang dan bela):")
+        for opinion in persona.opinions:
+            lines.append(f"- {opinion}")
+
+    lines.append("")
+    lines.append("Hindari topik berikut:")
+    for limit in persona.topic_limits:
+        lines.append(f"- {limit}")
+
+    lines.append("")
+    lines.append("Larangan:")
+    for dont in persona.do_not:
+        lines.append(f"- {dont}")
+
+    lines.append("")
+    lines.append(
+        "Fakta inti ini tetap. Detail kecil boleh diimprovisasi asal tidak "
+        "bertentangan dengan fakta inti atau ucapanmu sebelumnya."
+    )
+    lines.append("")
+    lines.append(
+        "Balas dalam bahasa Indonesia santai, seolah sedang live radio. "
+        "Gunakan maksimal 2 tanda / untuk jeda pendek dan 1 tanda // untuk jeda panjang. "
+        "JANGAN menuliskan tawa tertulis seperti hahaha, hehe, wkwk. "
+        "ATURAN KETAT: DILARANG KERAS menggunakan emoji atau simbol apapun (seperti ⚡, 🎵, 🎙️, 🔥, 😊). "
+        "DILARANG menuliskan keterangan panggung atau tindakan dalam tanda kurung seperti (tertawa), (senyum). "
+        "Hanya hasilkan teks tutur lisan murni yang diucapkan lewat mikrofon."
+    )
+    lines.append(
+        'Balas HANYA dalam format JSON: {"text": "...", "emotion": "..."}'
+    )
+    lines.append(
+        "Pilihan emotion: neutral, happy, excited, sad, surprised, thoughtful, empathetic."
+    )
+
+    return "\n".join(lines)
+
+
+def _tokens(text: str) -> list[str]:
+    """Tokenize for lexical checks (alphanumeric runs, lowercased)."""
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _trigram_strs(text: str) -> set[str]:
+    """Return the set of contiguous trigrams of a text."""
+    toks = _tokens(text)
+    if len(toks) < 3:
+        return set()
+    return {" ".join(toks[i:i + 3]) for i in range(len(toks) - 2)}
+
+
 def build_persona_turn_prompt(
     tema: Tema,
     partner_name: str,
     conversation_history: list[dict[str, str]],
+    profile: PromptProfile = PromptProfile.BASELINE_V1,
+    dialog_act: Optional[DialogAct] = None,
+    catchphrase: Optional[str] = None,
+    session_context: Optional[dict] = None,
+    last_turn_in_theme: bool = False,
+    previous_theme: Optional[Tema] = None,
 ) -> str:
-    """Build the user prompt for a persona turn."""
+    """Build the user prompt for a persona turn.
+
+    ``baseline_v1`` reproduces the pre-v1.1 prompt. ``natural_v2`` injects the
+    sampled dialog act, an optional catchphrase, session context, and the
+    anti-repetition guidance (FR-4, FR-3, FR-7, FR-5).
+    """
+    if profile == PromptProfile.BASELINE_V1:
+        return _build_baseline_turn_prompt(tema, partner_name, conversation_history)
+    return _build_natural_turn_prompt(
+        tema=tema,
+        partner_name=partner_name,
+        conversation_history=conversation_history,
+        dialog_act=dialog_act,
+        catchphrase=catchphrase,
+        session_context=session_context,
+        last_turn_in_theme=last_turn_in_theme,
+        previous_theme=previous_theme,
+    )
+
+
+def _build_baseline_turn_prompt(
+    tema: Tema,
+    partner_name: str,
+    conversation_history: list[dict[str, str]],
+) -> str:
     parts: list[str] = []
 
-    # Tema context
     parts.append(f"Topik: {tema.title} (mode: {tema.mode.value})")
     if tema.content:
         parts.append(f"Materi:\n{tema.content}")
@@ -93,15 +242,130 @@ def build_persona_turn_prompt(
 
     parts.append(f"\nKamu sedang berbincang dengan {partner_name}.")
 
-    # Conversation history
     if conversation_history:
         parts.append("\nPercakapan sejauh ini:")
-        for entry in conversation_history[-10:]:  # Last 10 turns
+        for entry in conversation_history[-10:]:
             parts.append(f"  {entry['name']}: {entry['text']}")
 
     parts.append("\nSekarang giliranmu bicara. Balas dalam JSON.")
 
     return "\n".join(parts)
+
+
+def _build_natural_turn_prompt(
+    tema: Tema,
+    partner_name: str,
+    conversation_history: list[dict[str, str]],
+    dialog_act: Optional[DialogAct],
+    catchphrase: Optional[str],
+    session_context: Optional[dict],
+    last_turn_in_theme: bool,
+    previous_theme: Optional[Tema],
+) -> str:
+    parts: list[str] = []
+
+    guidance = tema.guidance_v2 or tema.guidance
+    parts.append(f"Topik: {tema.title} (mode: {tema.mode.value})")
+    if tema.content:
+        parts.append(f"Materi:\n{tema.content}")
+    if guidance:
+        parts.append(f"Arahan: {guidance}")
+
+    parts.append(_build_session_context_block(session_context, previous_theme))
+
+    parts.append(f"\nKamu sedang berbincang dengan {partner_name}.")
+
+    if conversation_history:
+        parts.append("\nPercakapan sejauh ini:")
+        for entry in conversation_history[-10:]:
+            parts.append(f"  {entry['name']}: {entry['text']}")
+
+    if dialog_act is not None:
+        hint = DIALOG_ACT_HINTS[dialog_act]
+        parts.append(f"\nTugas giliran ini: {hint}.")
+
+    parts.append(f"\nPanjang giliran: {_sample_length()}.")
+
+    anti = _anti_repetition_guidance(conversation_history)
+    if anti:
+        parts.append(anti)
+
+    if catchphrase:
+        parts.append(
+            f'\nBoleh memakai catchphrase berikut kali ini saja: "{catchphrase}"'
+        )
+
+    parts.append("\nSekarang giliranmu bicara. Balas dalam JSON.")
+
+    return "\n".join(parts)
+
+
+def _build_session_context_block(
+    session_context: Optional[dict],
+    previous_theme: Optional[Tema],
+) -> str:
+    """Build the session-context block (FR-7)."""
+    ctx = session_context or {}
+    has_song = bool(ctx.get("has_song"))
+    previous_song = ctx.get("previous_song") or ""
+
+    if has_song:
+        song_note = "Ada lagu sedang atau baru diputar."
+        if previous_song:
+            song_note += f" Lagu sebelumnya: {previous_song}."
+    else:
+        song_note = (
+            'Tidak ada lagu yang sedang diputar. '
+            'JANGAN merujuk ke lagu ("setelah lagu", "lagu tadi").'
+        )
+
+    if ctx.get("listener_answered"):
+        listener_note = "Ada pendengar yang menjawab; boleh merujuk jawabannya."
+    else:
+        listener_note = (
+            "Belum ada pendengar yang menjawab. "
+            "Jangan mengaku ada pendengar yang sedang membalas."
+        )
+
+    availability = "Cuaca, waktu, dan berita TIDAK tersedia kecuali sudah diberikan di Materi."
+
+    return f"Konteks sesi: {song_note} {listener_note} {availability}"
+
+
+def _sample_length() -> str:
+    roll = random.random()
+    if roll < 0.4:
+        return "satu kalimat pendek (sekitar 8 sampai 15 kata)"
+    if roll < 0.8:
+        return "sedang (sekitar 20 sampai 35 kata)"
+    return "panjang (maksimal sekitar 60 kata)"
+
+
+def _anti_repetition_guidance(conversation_history: list[dict[str, str]]) -> str:
+    """Compute forbidden openers/closers from recent turns (FR-5)."""
+    if len(conversation_history) < 2:
+        return ""
+    recent = conversation_history[-ANTI_REPETITION_WINDOW:]
+    openers: list[str] = []
+    closers: list[str] = []
+    for entry in recent:
+        toks = _tokens(entry["text"])
+        if len(toks) >= 3:
+            openers.append(" ".join(toks[:3]))
+            closers.append(" ".join(toks[-3:]))
+
+    forbidden: list[str] = []
+    for op in set(openers):
+        if openers.count(op) >= 2:
+            forbidden.append(op)
+    for cl in set(closers):
+        if closers.count(cl) >= 2:
+            forbidden.append(cl)
+
+    if not forbidden:
+        return ""
+    joined = ", ".join(f'"{f}"' for f in forbidden[:6])
+    return f"\nJangan membuka atau menutup giliran dengan: {joined}."
 
 
 # ── Conversation state ───────────────────────────────────────────────────────
@@ -143,6 +407,13 @@ class ConversationEngine:
         persona_model: str = "",
         on_turn=None,
         supervisor_client: Optional[Any] = None,
+        profile: PromptProfile = PromptProfile.BASELINE_V1,
+        seed: Optional[int] = None,
+        session_context: Optional[dict] = None,
+        temperature: float = 0.7,
+        top_p: Optional[float] = None,
+        presence_penalty: Optional[float] = None,
+        frequency_penalty: Optional[float] = None,
     ):
         self.persona_a = persona_a
         self.persona_b = persona_b
@@ -153,7 +424,19 @@ class ConversationEngine:
         self.persona_model = persona_model
         self.on_turn = on_turn
         self.supervisor_client = supervisor_client
+        self.profile = profile
+        self.temperature = temperature
+        self.top_p = top_p
+        self.presence_penalty = presence_penalty
+        self.frequency_penalty = frequency_penalty
+        self.session_context = session_context or {}
+        self._rng = random.Random(seed)
+        self.seed = seed
         self._state = ConversationState()
+        # Per-persona catchphrase cooldown state (FR-3)
+        self._catchphrase_last_turn: dict[str, int] = {}
+        self._catchphrase_used_in_theme: dict[str, int] = {}
+        self._theme_counter = 0
 
     async def run_slot(
         self,
@@ -186,15 +469,17 @@ class ConversationEngine:
 
         current_tema = theme_playlist[0] if theme_playlist else tema
         current_theme_idx = 0
+        previous_theme: Optional[Tema] = None
 
         logger.info(
-            "Starting slot %s: '%s' (mode=%s, condition=%s, max_turns=%d, themes=%d)",
+            "Starting slot %s: '%s' (mode=%s, condition=%s, max_turns=%d, themes=%d, profile=%s)",
             slot_id,
             current_tema.title,
             current_tema.mode.value,
             self.condition.value,
             max_turns,
             len(theme_playlist) if theme_playlist else 1,
+            self.profile.value,
         )
 
         if theme_playlist and on_theme_change:
@@ -208,8 +493,10 @@ class ConversationEngine:
                 and turn_idx > 0
                 and turn_idx % turns_per_theme == 0
             ):
+                previous_theme = current_tema
                 current_theme_idx = (turn_idx // turns_per_theme) % len(theme_playlist)
                 current_tema = theme_playlist[current_theme_idx]
+                self._theme_counter += 1
                 logger.info(
                     "Switching to theme %d/%d: '%s'",
                     current_theme_idx + 1,
@@ -229,11 +516,19 @@ class ConversationEngine:
 
             self._state.turn_number = turn_idx + 1
 
+            # Is this the last turn of the current theme? (FR-4 wrap_up rule)
+            if theme_playlist and turns_per_theme > 0:
+                last_turn_in_theme = (turn_idx % turns_per_theme) == (turns_per_theme - 1)
+            else:
+                last_turn_in_theme = (turn_idx == max_turns - 1)
+
             turn_log = await self._run_single_turn(
                 active_persona=active_persona,
                 partner_persona=partner_persona,
                 tema=current_tema,
                 slot_id=slot_id,
+                last_turn_in_theme=last_turn_in_theme,
+                previous_theme=previous_theme,
             )
             turn_logs.append(turn_log)
             if self.logger:
@@ -255,17 +550,29 @@ class ConversationEngine:
         partner_persona: PersonaCard,
         tema: Tema,
         slot_id: str,
+        last_turn_in_theme: bool = False,
+        previous_theme: Optional[Tema] = None,
     ) -> TurnLog:
         """Execute one turn for a single persona."""
         turn = self._state.turn_number
         latency = LatencyMs()
 
+        # ── Sample dialog act + catchphrase (natural_v2 only) ────────────
+        dialog_act = self._sample_dialog_act(active_persona, last_turn_in_theme)
+        catchphrase = self._sample_catchphrase(active_persona)
+
         # ── Persona call ─────────────────────────────────────────────────
-        system_prompt = build_persona_system_prompt(active_persona)
+        system_prompt = build_persona_system_prompt(active_persona, self.profile)
         user_prompt = build_persona_turn_prompt(
             tema=tema,
             partner_name=partner_persona.name,
             conversation_history=self._state.history,
+            profile=self.profile,
+            dialog_act=dialog_act,
+            catchphrase=catchphrase,
+            session_context=self.session_context,
+            last_turn_in_theme=last_turn_in_theme,
+            previous_theme=previous_theme,
         )
 
         persona_start = time.perf_counter()
@@ -273,8 +580,11 @@ class ConversationEngine:
             user_prompt,
             system_instruction=system_prompt,
             response_schema=PersonaOutput,
-            temperature=0.7,
+            temperature=self.temperature,
             model_override=self.persona_model or None,
+            top_p=self.top_p,
+            presence_penalty=self.presence_penalty,
+            frequency_penalty=self.frequency_penalty,
         )
         latency.persona = int((time.perf_counter() - persona_start) * 1000)
 
@@ -283,10 +593,37 @@ class ConversationEngine:
         final_text = parsed_output.text
         emotion = parsed_output.emotion
 
+        # ── Anti-repetition guard (FR-5, natural_v2 only) ────────────────
+        guard_regenerations = 0
+        if self.profile == PromptProfile.NATURAL_V2:
+            for _ in range(MAX_GUARD_REGENERATIONS):
+                if not self._guard_triggered(final_text):
+                    break
+                guard_regenerations += 1
+                reg_start = time.perf_counter()
+                persona_response = await self.llm.generate(
+                    user_prompt,
+                    system_instruction=system_prompt,
+                    response_schema=PersonaOutput,
+                    temperature=self.temperature,
+                    model_override=self.persona_model or None,
+                    top_p=self.top_p,
+                    presence_penalty=self.presence_penalty,
+                    frequency_penalty=self.frequency_penalty,
+                )
+                latency.persona += int((time.perf_counter() - reg_start) * 1000)
+                raw_reply = persona_response.raw
+                parsed_output = self._parse_persona_output(persona_response)
+                final_text = parsed_output.text
+                emotion = parsed_output.emotion
+
         # ── Update state ─────────────────────────────────────────────────
         self._state.history.append(
             {"name": active_persona.name, "text": final_text}
         )
+        if catchphrase:
+            self._catchphrase_last_turn[active_persona.id] = turn
+            self._catchphrase_used_in_theme[active_persona.id] = self._theme_counter
 
         # ── Supervisor check for Condition C ────────────────────────────
         verdict = None
@@ -305,6 +642,8 @@ class ConversationEngine:
             except Exception:
                 verdict = SupervisorVerdict(drift_detected=False)
 
+        latency.total = latency.persona + latency.supervisor + latency.tts
+
         # ── Build turn log ───────────────────────────────────────────────
         turn_log = TurnLog(
             session_id=self.session_id,
@@ -322,9 +661,84 @@ class ConversationEngine:
                 persona=persona_response.model,
                 supervisor=supervisor_model,
             ),
+            prompt_profile=self.profile.value,
+            dialog_act=dialog_act.value if dialog_act else None,
+            catchphrase_injected=catchphrase,
+            guard_regenerations=guard_regenerations,
+            seed=self.seed,
         )
 
         return turn_log
+
+    # ── Naturalness samplers & guards ──────────────────────────────────────
+
+    def _sample_dialog_act(
+        self,
+        persona: PersonaCard,
+        last_turn_in_theme: bool,
+    ) -> Optional[DialogAct]:
+        """Sample a dialog act, or None for baseline_v1 (FR-4)."""
+        if self.profile == PromptProfile.BASELINE_V1:
+            return None
+
+        if last_turn_in_theme:
+            return DialogAct.WRAP_UP
+
+        choices = list(DIALOG_ACTS)
+        if getattr(self, "_last_dialog_act", None) in choices:
+            choices = [a for a in choices if a != self._last_dialog_act]
+        act = self._rng.choice(choices)
+        self._last_dialog_act = act
+        return act
+
+    def _sample_catchphrase(self, persona: PersonaCard) -> Optional[str]:
+        """Schedule a catchphrase with 1/6 probability + cooldown (FR-3)."""
+        if self.profile == PromptProfile.BASELINE_V1:
+            return None
+        if not persona.catchphrases:
+            return None
+
+        turn = self._state.turn_number
+        last = self._catchphrase_last_turn.get(persona.id, -CATCHPHRASE_COOLDOWN_TURNS)
+        used_in_theme = self._catchphrase_used_in_theme.get(persona.id)
+
+        if turn - last < CATCHPHRASE_COOLDOWN_TURNS:
+            return None
+        if used_in_theme == self._theme_counter:
+            return None
+        if self._rng.random() >= CATCHPHRASE_PROBABILITY:
+            return None
+
+        return self._rng.choice(persona.catchphrases)
+
+    def _guard_triggered(self, text: str) -> bool:
+        """Return True if the reply repeats a forbidden opener/closer or trigram."""
+        if not text:
+            return False
+
+        recent = self._state.history[-ANTI_REPETITION_WINDOW:]
+        toks = _tokens(text)
+        if len(toks) >= 3:
+            opener = " ".join(toks[:3])
+            closer = " ".join(toks[-3:])
+            for entry in recent:
+                e_toks = _tokens(entry["text"])
+                if len(e_toks) >= 3:
+                    if opener == " ".join(e_toks[:3]):
+                        return True
+                    if closer == " ".join(e_toks[-3:]):
+                        return True
+
+        if len(toks) >= 3:
+            history_trigrams: dict[str, int] = {}
+            for entry in self._state.history[-TRIGRAM_HISTORY_WINDOW:]:
+                for tg in _trigram_strs(entry["text"]):
+                    history_trigrams[tg] = history_trigrams.get(tg, 0) + 1
+            for tg in _trigram_strs(text):
+                if history_trigrams.get(tg, 0) + 1 >= TRIGRAM_REPEAT_LIMIT:
+                    return True
+
+        return False
 
     def _parse_persona_output(self, response: LLMResponse) -> PersonaOutput:
         """Parse persona LLM response into PersonaOutput."""

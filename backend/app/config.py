@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     TTS_MODE: Literal["live", "mock"] = "live"
     MUSIC_PROVIDER: Literal["mock", "deezer"] = "deezer"
 
+    # --- Prompt profile & sampling (PRD v1.1 FR-1, FR-10) ---
+    PROMPT_PROFILE: Literal["baseline_v1", "natural_v2"] = "baseline_v1"
+    PERSONA_TEMPERATURE: float = 0.7
+    PERSONA_TOP_P: float = 0.0  # 0 = not sent
+    PERSONA_PRESENCE_PENALTY: float = 0.0  # 0 = not sent
+    PERSONA_FREQUENCY_PENALTY: float = 0.0  # 0 = not sent
+
     # --- Testing ---
     FAIL_INJECT: str = ""  # llm | tts | music
 

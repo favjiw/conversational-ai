@@ -63,6 +63,9 @@ class LLMClient(ABC):
         response_schema: Type[BaseModel] | None = None,
         temperature: float = 1.0,
         model_override: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> LLMResponse:
         """Generate a structured response.
 
@@ -72,6 +75,9 @@ class LLMClient(ABC):
             response_schema: Optional Pydantic model for structured output.
             temperature: Sampling temperature.
             model_override: Use this model instead of the default.
+            top_p: Optional nucleus sampling parameter (only if supported).
+            presence_penalty: Optional presence penalty (only if supported).
+            frequency_penalty: Optional frequency penalty (only if supported).
 
         Returns:
             An ``LLMResponse`` with parsed and raw outputs.
@@ -101,6 +107,9 @@ class MockLLMClient(LLMClient):
         response_schema: Type[BaseModel] | None = None,
         temperature: float = 1.0,
         model_override: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> LLMResponse:
         self._call_count += 1
         model = model_override or self._model
@@ -203,6 +212,9 @@ class GeminiLLMClient(LLMClient):
         response_schema: Type[BaseModel] | None = None,
         temperature: float = 1.0,
         model_override: str | None = None,
+        top_p: float | None = None,
+        presence_penalty: float | None = None,
+        frequency_penalty: float | None = None,
     ) -> LLMResponse:
         from google import genai
         from google.genai import types
@@ -225,6 +237,20 @@ class GeminiLLMClient(LLMClient):
         if response_schema:
             config_kwargs["response_mime_type"] = "application/json"
             config_kwargs["response_schema"] = response_schema
+
+        # Optional sampling params (PRD v1.1 FR-10). Gemini does not support
+        # presence/frequency penalty; pass through top_p only if supported,
+        # otherwise ignore with a warning.
+        if top_p is not None:
+            config_kwargs["top_p"] = top_p
+        for name, val in (("presence_penalty", presence_penalty), ("frequency_penalty", frequency_penalty)):
+            if val is not None:
+                logger.warning(
+                    "Model %s does not support %s; ignoring value %s",
+                    model,
+                    name,
+                    val,
+                )
 
         config = types.GenerateContentConfig(**config_kwargs)
 

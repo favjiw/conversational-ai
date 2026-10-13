@@ -28,6 +28,7 @@ from app.schemas import (
     Emotion,
     ExperimentCondition,
     PersonaCard,
+    PromptProfile,
     SessionState,
     SessionStatus,
     Tema,
@@ -207,7 +208,15 @@ async def search_music(category: str = "", query: str = "", limit: int = 5):
 
 
 
-def load_aron_themes() -> list[Tema]:
+def load_aron_themes(
+    profile: PromptProfile = PromptProfile.BASELINE_V1,
+    include_sensitive: bool = False,
+) -> list[Tema]:
+    """Load Aron closeness themes, selecting guidance per profile (FR-2, FR-8).
+
+    ``baseline_v1`` uses the original ``guidance``; ``natural_v2`` uses
+    ``guidance_v2``. Sensitive themes are skipped unless explicitly allowed.
+    """
     themes_path = Path(__file__).parent / "data" / "aron_themes_id.json"
     if not themes_path.exists():
         return []
@@ -215,18 +224,39 @@ def load_aron_themes() -> list[Tema]:
         data = json.loads(themes_path.read_text(encoding="utf-8"))
         themes = []
         for item in data:
+            if item.get("sensitive") and not include_sensitive:
+                continue
+            guidance = item["guidance"]
+            if profile == PromptProfile.NATURAL_V2:
+                guidance = item.get("guidance_v2") or item["guidance"]
             themes.append(
                 Tema(
                     title=item["title"],
                     mode=TemaMode.IMPROV,
                     content=f"Set: {item['set_label']}. Pertanyaan: {item['question_id']}",
-                    guidance=item["guidance"],
+                    guidance=guidance,
+                    guidance_v2=item.get("guidance_v2"),
+                    sensitive=bool(item.get("sensitive")),
                 )
             )
         return themes
     except Exception as e:
         logger.error("Failed loading aron themes: %s", e)
         return []
+
+
+def load_persona(persona_id: str, default: Optional[PersonaCard] = None) -> Optional[PersonaCard]:
+    """Load a persona card from data/persona/{id}.json (FR-6)."""
+    persona_path = Path(__file__).parent / "data" / "persona" / f"{persona_id}.json"
+    if not persona_path.exists():
+        logger.warning("Persona file %s not found; using default", persona_path)
+        return default
+    try:
+        data = json.loads(persona_path.read_text(encoding="utf-8"))
+        return PersonaCard.model_validate(data)
+    except Exception as e:
+        logger.error("Failed loading persona %s: %s", persona_id, e)
+        return default
 
 
 class StartSessionRequest(BaseModel):
@@ -244,6 +274,8 @@ class StartSessionRequest(BaseModel):
     preset: Optional[str] = "custom"  # "quick", "15min", "1hour_aron", "custom"
     theme_mode: Optional[str] = "single"  # "single" | "aron_closeness"
     turns_per_theme: Optional[int] = 6
+    prompt_profile: Optional[PromptProfile] = None
+    include_sensitive: Optional[bool] = False
 
 
 @app.get("/api/themes/aron")
@@ -290,14 +322,14 @@ async def start_session(req: StartSessionRequest):
     session_id = f"session_{uuid.uuid4().hex[:8]}"
     current_session_id = session_id
 
-    # Resolve Persona A
+    # Resolve Persona A (FR-6: load from file, allow override)
     name_a = "Raka"
     style_a = "Pria ceria, lugas, santai, energi tinggi"
     if isinstance(req.persona_a, dict):
         name_a = req.persona_a.get("name") or name_a
         style_a = req.persona_a.get("style") or style_a
 
-    persona_a = req.custom_persona_a or PersonaCard(
+    default_a = PersonaCard(
         id="persona_a",
         name=name_a,
         gender="male",
@@ -308,6 +340,7 @@ async def start_session(req: StartSessionRequest):
         background_facts=["Penyiar radio muda Bandung", "Suka kopi dan kuliner"],
         do_not=["Jangan gunakan bahasa kaku", "Jangan mengulang kalimat persis"],
     )
+    persona_a = req.custom_persona_a or load_persona("raka", default_a) or default_a
 
     # Resolve Persona B
     name_b = "Salsa"
@@ -316,7 +349,7 @@ async def start_session(req: StartSessionRequest):
         name_b = req.persona_b.get("name") or name_b
         style_b = req.persona_b.get("style") or style_b
 
-    persona_b = req.custom_persona_b or PersonaCard(
+    default_b = PersonaCard(
         id="persona_b",
         name=name_b,
         gender="female",
@@ -327,6 +360,7 @@ async def start_session(req: StartSessionRequest):
         background_facts=["Penyiar radio hits Bandung", "Suka nonton konser dan tren sosial"],
         do_not=["Jangan gunakan bahasa kaku", "Jangan memotong kasar"],
     )
+    persona_b = req.custom_persona_b or load_persona("salsa", default_b) or default_b
 
     topic_title = req.topic or req.custom_tema_title or "Kemacetan pagi di Bandung"
     tema = Tema(
@@ -387,6 +421,10 @@ async def start_session(req: StartSessionRequest):
             "data": event.model_dump(),
         })
 
+    # Resolve prompt profile (FR-1): request > env > default
+    profile = req.prompt_profile or PromptProfile(settings.PROMPT_PROFILE)
+    seed = uuid.uuid4().int & 0xFFFFFFFF
+
     current_engine = ConversationEngine(
         persona_a=persona_a,
         persona_b=persona_b,
@@ -396,14 +434,25 @@ async def start_session(req: StartSessionRequest):
         session_id=session_id,
         session_logger=session_logger,
         on_turn=on_turn_callback,
+        profile=profile,
+        seed=seed,
+        session_context={
+            "has_song": False,
+            "listener_answered": False,
+        },
+        temperature=settings.PERSONA_TEMPERATURE,
+        top_p=settings.PERSONA_TOP_P if settings.PERSONA_TOP_P > 0 else None,
+        presence_penalty=settings.PERSONA_PRESENCE_PENALTY if settings.PERSONA_PRESENCE_PENALTY > 0 else None,
+        frequency_penalty=settings.PERSONA_FREQUENCY_PENALTY if settings.PERSONA_FREQUENCY_PENALTY > 0 else None,
     )
 
     theme_playlist = None
     max_turns = req.max_turns
-    turns_per_theme = req.turns_per_theme or 6
+    # FR-8: turns_per_theme default becomes 4
+    turns_per_theme = req.turns_per_theme if (req.turns_per_theme is not None and req.turns_per_theme > 0) else 4
 
     if req.preset in ("1hour_aron", "15min") or req.theme_mode == "aron_closeness":
-        aron_list = load_aron_themes()
+        aron_list = load_aron_themes(profile=profile, include_sensitive=bool(req.include_sensitive))
         if aron_list:
             if req.preset == "15min":
                 theme_playlist = aron_list[:8]
@@ -523,7 +572,7 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
     voice_a = settings.EDGE_VOICE_MALE if settings.TTS_PROVIDER == "edge" else (settings.ELEVENLABS_VOICE_A or "JBFqnCBsd6RMkjVDRZzb")
     voice_b = settings.EDGE_VOICE_FEMALE if settings.TTS_PROVIDER == "edge" else (settings.ELEVENLABS_VOICE_B or "EXAVITQu4vr4xnSDxMaL")
 
-    persona_a = PersonaCard(
+    persona_a = load_persona("raka") or PersonaCard(
         id="persona_a",
         name="Raka",
         gender="male",
@@ -535,7 +584,7 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         do_not=["Jangan gunakan bahasa kaku"],
     )
 
-    persona_b = PersonaCard(
+    persona_b = load_persona("salsa") or PersonaCard(
         id="persona_b",
         name="Salsa",
         gender="female",

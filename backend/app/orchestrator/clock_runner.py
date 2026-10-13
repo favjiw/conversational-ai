@@ -38,19 +38,24 @@ logger = logging.getLogger(__name__)
 
 
 def clean_text_for_tts(text: str) -> str:
-    """Strip bracketed tags, emojis, and symbols so TTS reads only spoken radio words."""
+    """Strip bracketed tags, emojis, symbols, and written laughter so TTS reads only spoken radio words."""
     # 1. Remove bracketed or parenthesized cues like [ADLIBS / SPONSOR], [Smash], (tertawa)
     cleaned = re.sub(r"\[.*?\]", "", text)
     cleaned = re.sub(r"\(.*?\)", "", cleaned)
-    # 2. Remove emojis and uncommon unicode symbol ranges
+    # 2. Remove written laughter (PRD v1.1 FR-9): hahaha, hehe, wkwk, etc.
+    cleaned = re.sub(r"\b(?:ha){2,}h?\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:he){2,}h?\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:wk|wkwk|wkwkwk)+\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:hihi|hihihi)+\b", "", cleaned, flags=re.IGNORECASE)
+    # 3. Remove emojis and uncommon unicode symbol ranges
     cleaned = re.sub(
         r"[\U00010000-\U0010ffff\u2600-\u26ff\u2700-\u27bf\u2300-\u23ff\u2b50\u200d\ufe0f]",
         "",
         cleaned,
     )
-    # 3. Remove markdown symbols and quotes
+    # 4. Remove markdown symbols and quotes
     cleaned = re.sub(r"[*#~`\"']+", "", cleaned)
-    # 4. Collapse spaces
+    # 5. Collapse spaces
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
@@ -88,6 +93,35 @@ TALK_DEFAULT_TOPICS = {
     "s38": ("Closing & Next Live", "Pamitan siaran Pagi Bener hari ini, terima kasih pendengar dan nantikan siaran besok jam 7 pagi!"),
 }
 
+# Tema library path (PRD v1.1 FR-8)
+TEMA_LIBRARY_PATH = Path(__file__).resolve().parent.parent / "data" / "tema"
+
+
+def load_tema_library() -> dict[str, Tema]:
+    """Load the radio topic library from data/tema/*.json (FR-8)."""
+    library: dict[str, Tema] = {}
+    if not TEMA_LIBRARY_PATH.exists():
+        return library
+    import json
+
+    for f in TEMA_LIBRARY_PATH.glob("*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            logger.warning("Failed to read tema library %s", f)
+            continue
+        for slot_id, entry in data.items():
+            try:
+                library[slot_id] = Tema(
+                    title=entry.get("title", slot_id),
+                    mode=TemaMode(entry.get("mode", "improv")),
+                    content=entry.get("content"),
+                    guidance=entry.get("guidance"),
+                )
+            except Exception as e:
+                logger.warning("Invalid tema entry %s: %s", slot_id, e)
+    return library
+
 
 class ClockRunner:
     """Orchestrates the 39-slot live radio clock."""
@@ -116,6 +150,7 @@ class ClockRunner:
 
         self.demo_music_sec = demo_music_sec
         self.talk_turns_per_slot = talk_turns_per_slot
+        self._tema_library = load_tema_library()
 
         self._state = SessionState.IDLE
         self._session_id = ""
@@ -393,10 +428,24 @@ class ClockRunner:
         await self._speak_turn(slot.id, outro_speaker, outro_text, emotion="happy", wait_spoken=True)
 
     async def _handle_talk_slot(self, slot: Slot) -> None:
-        title, guidance = TALK_DEFAULT_TOPICS.get(
-            slot.id, (slot.label or "Obrolan Pagi Bener", "Obrolan santai penyiar")
-        )
-        tema = Tema(title=title, mode=TemaMode.IMPROV, content=guidance, guidance=guidance)
+        # Prefer slot.tema (from clock) then the tema library, then fallback (FR-8)
+        tema = None
+        if slot.tema is not None:
+            tema = slot.tema
+            # Fill missing content/guidance from the library or static topics
+            lib_entry = self._tema_library.get(slot.id)
+            if tema.content is None and lib_entry is not None:
+                tema = lib_entry
+        else:
+            lib_entry = self._tema_library.get(slot.id)
+            if lib_entry is not None:
+                tema = lib_entry
+
+        if tema is None:
+            title, guidance = TALK_DEFAULT_TOPICS.get(
+                slot.id, (slot.label or "Obrolan Pagi Bener", "Obrolan santai penyiar")
+            )
+            tema = Tema(title=title, mode=TemaMode.IMPROV, content=guidance, guidance=guidance)
         async def on_turn(turn_log) -> None:
             speaker = self.persona_a if turn_log.persona == self.persona_a.id else self.persona_b
             emotion_str = turn_log.emotion.value if hasattr(turn_log.emotion, "value") else str(turn_log.emotion)

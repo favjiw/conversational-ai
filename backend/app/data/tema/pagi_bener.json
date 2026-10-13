@@ -1,0 +1,38 @@
+{
+  "s08": {
+    "title": "Talk 1 - HITS News",
+    "mode": "scripted",
+    "content": "Berita pagi: gempa magnitudo 4.6 mengguncang Kabupaten Bandung dini hari tadi, tidak berpotensi tsunami. Dinas Pendidikan Kota Bandung membuka pendaftaran beasiswa prestasi untuk mahasiswa. Agenda kampus: HITS Unikom Radio mengadakan open recruitment penyiar baru pekan ini.",
+    "guidance": "Bacakan berita singkat dengan jelas, lalu beri satu reaksi atau pendapat singkat dari masing-masing penyiar."
+  },
+  "s10": {
+    "title": "Talk 2 - Traffic Info",
+    "mode": "scripted",
+    "content": "Update arus lalu lintas: Jalan Dipatiukur padat merayap arah Dago, kepadatan di persimpangan Surapati. Jalan Pasteur ramai lancar. Jalan Dago arah Simpang macet karena perbaikan drainase. Pengendara disarankan lewat jalur alternatif Cihampelas.",
+    "guidance": "Sampaikan info lalu lintas dengan jelas, lalu beri tips berkendara aman untuk pendengar yang berangkat pagi."
+  },
+  "s19": {
+    "title": "Talk 3 - Teaser 3M",
+    "mode": "improv",
+    "content": "Segmen Masalah, Musik, dan Motivasi akan hadir. Pendengar bisa kirim curhat masalah pagi hari lewat kolom komentar live.",
+    "guidance": "Teaser segmen 3M, ajak pendengar ikut kirim curhat sekali saja, jangan berlebihan."
+  },
+  "s28": {
+    "title": "Talk 4 - 3M Curhat",
+    "mode": "listener_content",
+    "content": "Curhat pendengar: susah bangun pagi karena begadang, takut telat kuliah, dan drama tugas skripsi yang belum kelar. Pendengar butuh motivasi memulai hari.",
+    "guidance": "Bahas curhat pendengar dengan empati, kasih pendapat dan solusi santai dari sudut pandang masing-masing."
+  },
+  "s36": {
+    "title": "Talk 5 - 3M Solusi",
+    "mode": "listener_content",
+    "content": "Lanjutan solusi untuk curhat pendengar: tips bangun pagi, atur waktu skripsi, dan semangat menjalani hari.",
+    "guidance": "Kasih solusi dan motivasi penutup segmen 3M, tutup dengan hangat."
+  },
+  "s38": {
+    "title": "Closing + Selling Next Live",
+    "mode": "scripted",
+    "content": "Pamitan siaran Pagi Bener hari ini, terima kasih untuk pendengar, dan ajakan dengar siaran besok pagi jam 7.",
+    "guidance": "Pamitan yang hangat, sebutkan terima kasih dan nantikan siaran besok."
+  }
+}

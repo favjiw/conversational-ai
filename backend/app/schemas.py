@@ -88,6 +88,24 @@ class SessionState(str, Enum):
     FINISHED = "finished"
 
 
+class PromptProfile(str, Enum):
+    """Prompt profile selector (PRD v1.1 FR-1)."""
+    BASELINE_V1 = "baseline_v1"
+    NATURAL_V2 = "natural_v2"
+
+
+class DialogAct(str, Enum):
+    """Dialog act sampled per turn (PRD v1.1 FR-4)."""
+    ANECDOTE = "anecdote"
+    OPINION_DIFF = "opinion_diff"
+    NEW_FACT = "new_fact"
+    PERSONAL_QUESTION = "personal_question"
+    TEASE = "tease"
+    SHORT_REACT = "short_react"
+    TRANSITION = "transition"
+    WRAP_UP = "wrap_up"
+
+
 # ── Clock & Tema ─────────────────────────────────────────────────────────────
 
 class Tema(BaseModel):
@@ -96,6 +114,8 @@ class Tema(BaseModel):
     mode: TemaMode
     content: Optional[str] = None
     guidance: Optional[str] = None
+    guidance_v2: Optional[str] = None
+    sensitive: bool = False
 
 
 class Slot(BaseModel):
@@ -146,6 +166,7 @@ class PersonaCard(BaseModel):
     topic_limits: list[str] = Field(default_factory=list)
     background_facts: list[str] = Field(default_factory=list)
     do_not: list[str] = Field(default_factory=list)
+    opinions: list[str] = Field(default_factory=list)
 
 
 # ── LLM Outputs ──────────────────────────────────────────────────────────────
@@ -188,6 +209,7 @@ class LatencyMs(BaseModel):
     persona: int = 0
     supervisor: int = 0
     tts: int = 0
+    total: int = 0
 
 
 class ModelsUsed(BaseModel):
@@ -210,6 +232,11 @@ class TurnLog(BaseModel):
     emotion: Emotion
     latency_ms: LatencyMs = Field(default_factory=LatencyMs)
     models: ModelsUsed = Field(default_factory=ModelsUsed)
+    prompt_profile: str = "baseline_v1"
+    dialog_act: Optional[str] = None
+    catchphrase_injected: Optional[str] = None
+    guard_regenerations: int = 0
+    seed: Optional[int] = None
 
 
 # ── WebSocket Events ─────────────────────────────────────────────────────────
@@ -245,3 +272,4 @@ class StartSessionRequest(BaseModel):
     custom_tema_mode: TemaMode = TemaMode.IMPROV
     custom_persona_a: Optional[PersonaCard] = None
     custom_persona_b: Optional[PersonaCard] = None
+    prompt_profile: Optional[PromptProfile] = None
