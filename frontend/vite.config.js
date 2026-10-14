@@ -19,6 +19,11 @@ export default defineConfig({
       '/audio': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        bypass(req) {
+          if (req.url && (req.url.startsWith('/audio/scenarios') || req.url.includes('_test.wav'))) {
+            return req.url;
+          }
+        },
       },
       '/ws': {
         target: 'ws://127.0.0.1:8000',

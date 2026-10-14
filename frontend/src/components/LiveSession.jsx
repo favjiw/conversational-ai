@@ -38,12 +38,13 @@ export default function LiveSession() {
     playbackState,
     slotElapsedSec,
     handleSkipNext,
+    stageConnected,
   } = useLiveSession();
 
   return (
     <div className="min-h-screen bg-[#f8f9fb] text-gray-900 font-sans flex flex-col justify-between selection:bg-gray-200">
       <div className="max-w-[1140px] w-full mx-auto px-6 py-8 flex-1">
-        <Header isRunning={isRunning} wsConnected={wsConnected} />
+        <Header isRunning={isRunning} wsConnected={wsConnected} stageConnected={stageConnected} />
 
         <main className="space-y-6">
           <SessionConfig

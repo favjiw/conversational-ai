@@ -1,0 +1,42 @@
+{
+  "id": "dialog-netral-01",
+  "title": "Dialog Netral Pendek",
+  "characters": {
+    "persona_a": {
+      "name": "Raka",
+      "model": "models/red-male.vrm",
+      "voice": "Microsoft David Desktop"
+    },
+    "persona_b": {
+      "name": "Salsa",
+      "model": "models/female.vrm",
+      "voice": "Microsoft Zira Desktop"
+    }
+  },
+  "turns": [
+    {
+      "persona": "persona_a",
+      "text": "Hello Salsa, welcome to our 3D avatar prototype studio today.",
+      "emotion": "neutral",
+      "audio": "audio/scenarios/s1_t1.wav"
+    },
+    {
+      "persona": "persona_b",
+      "text": "Hello Raka. I am very glad to test this live prototype system with you.",
+      "emotion": "neutral",
+      "audio": "audio/scenarios/s1_t2.wav"
+    },
+    {
+      "persona": "persona_a",
+      "text": "We will check whether the lip sync and facial expressions perform smoothly.",
+      "emotion": "neutral",
+      "audio": "audio/scenarios/s1_t3.wav"
+    },
+    {
+      "persona": "persona_b",
+      "text": "Certainly, all audio signals and animations look ready for testing.",
+      "emotion": "neutral",
+      "audio": "audio/scenarios/s1_t4.wav"
+    }
+  ]
+}

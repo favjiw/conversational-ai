@@ -1,0 +1,60 @@
+{
+  "id": "emosi-tajam-01",
+  "title": "Dialog dengan Perubahan Emosi",
+  "characters": {
+    "persona_a": {
+      "name": "Raka",
+      "model": "models/red-male.vrm",
+      "voice": "Microsoft David Desktop"
+    },
+    "persona_b": {
+      "name": "Salsa",
+      "model": "models/female.vrm",
+      "voice": "Microsoft Zira Desktop"
+    }
+  },
+  "turns": [
+    {
+      "persona": "persona_a",
+      "text": "Good morning everyone! Today we have received truly exciting news!",
+      "emotion": "excited",
+      "audio": "audio/scenarios/s2_t1.wav"
+    },
+    {
+      "persona": "persona_b",
+      "text": "What exciting news Raka? Please do not keep me waiting in suspense!",
+      "emotion": "surprised",
+      "audio": "audio/scenarios/s2_t2.wav"
+    },
+    {
+      "persona": "persona_a",
+      "text": "Our avatar prototype has passed all technical requirements with flying colors!",
+      "emotion": "happy",
+      "audio": "audio/scenarios/s2_t3.wav"
+    },
+    {
+      "persona": "persona_b",
+      "text": "Hmm, let me think carefully. Can our team still maintain the deadline?",
+      "emotion": "thoughtful",
+      "audio": "audio/scenarios/s2_t4.wav"
+    },
+    {
+      "persona": "persona_a",
+      "text": "Unfortunately we will have to put in extra effort and work this weekend.",
+      "emotion": "sad",
+      "audio": "audio/scenarios/s2_t5.wav"
+    },
+    {
+      "persona": "persona_b",
+      "text": "Do not worry Raka, we are in this together and I completely understand.",
+      "emotion": "empathetic",
+      "audio": "audio/scenarios/s2_t6.wav"
+    },
+    {
+      "persona": "persona_a",
+      "text": "Thank you for your empathy! Let us build an awesome demonstration now!",
+      "emotion": "excited",
+      "audio": "audio/scenarios/s2_t7.wav"
+    }
+  ]
+}
