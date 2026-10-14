@@ -74,6 +74,17 @@ class TestOutputRouting(unittest.TestCase):
                     pass
                 runner.playback_feedback.assert_called_once_with(feedback["data"])
 
+    def test_speaking_is_relayed_only_from_owner(self):
+        with self.client.websocket_connect("/ws/session?role=console") as console, \
+             self.client.websocket_connect("/ws/session?role=stage") as stage:
+            console.send_json({"action": "speaking", "data": {"persona": "persona_b"}})
+            stage.send_json({"action": "speaking", "data": {"persona": "persona_a"}})
+            while True:
+                msg = console.receive_json()
+                if msg["type"] == "speaking":
+                    break
+            self.assertEqual(msg["data"], {"persona": "persona_a"})
+
     def test_owner_change_releases_pending_playback(self):
         runner = MagicMock()
         with patch.object(main, "clock_runner_instance", runner):

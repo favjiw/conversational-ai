@@ -37,7 +37,13 @@ export function useLiveSession() {
   const slotRef = useRef(null);
   const skippingRef = useRef(false);
 
-  const clearAudio = () => {
+  // Output routing: when /stage is connected it owns audio and this console
+  // only monitors (no local playback, no playback feedback).
+  const isAudioOwnerRef = useRef(true);
+  const [isAudioOwner, setIsAudioOwner] = useState(true);
+  const [stageConnected, setStageConnected] = useState(false);
+
+  const stopLocalAudio = () => {
     const audio = currentAudioRef.current;
     currentAudioRef.current = null;
     if (audio) {
@@ -48,12 +54,16 @@ export function useLiveSession() {
     }
     audioQueueRef.current = [];
     isPlayingAudioRef.current = false;
+  };
+
+  const clearAudio = () => {
+    stopLocalAudio();
     setActiveSpeaker(null);
     setMusicTrack(null);
   };
 
   const feedback = (item, state, message) => {
-    if (item.playback_id && wsRef.current?.readyState === WebSocket.OPEN) {
+    if (isAudioOwnerRef.current && item.playback_id && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ action: 'playback_feedback', data: {
         session_id: item.session_id, generation: item.generation,
         playback_id: item.playback_id, state, message,
@@ -99,6 +109,21 @@ export function useLiveSession() {
           } else if (msg.data.state === 'running') {
             currentSessionRef.current = msg.data.session_id;
           }
+        } else if (msg.type === 'output_status') {
+          const owner = Boolean(msg.data.is_audio_owner);
+          if (!owner && isAudioOwnerRef.current) {
+            // Stage took over: silence the local copy, keep the UI state.
+            stopLocalAudio();
+            setActiveSpeaker(null);
+          }
+          isAudioOwnerRef.current = owner;
+          setIsAudioOwner(owner);
+          setStageConnected(Boolean(msg.data.stage_connected));
+        } else if (msg.type === 'speaking') {
+          if (!isAudioOwnerRef.current) {
+            setActiveSpeaker(msg.data.persona || null);
+            setPlaybackState(msg.data.persona ? 'playing' : 'loading');
+          }
         } else if (msg.type === 'theme_change') {
           setCurrentTheme(msg.data);
         } else if (msg.type === 'turn') {
@@ -125,7 +150,9 @@ export function useLiveSession() {
         } else if (msg.type === 'clock_music') {
           const mTrack = msg.data;
           setMusicTrack(mTrack.track);
-          if (mTrack.track?.preview_url) {
+          if (!isAudioOwnerRef.current) {
+            setPlaybackState('playing');
+          } else if (mTrack.track?.preview_url) {
             audioQueueRef.current.push({
               slot_id: mTrack.slot_id,
               type: 'music',
@@ -163,6 +190,7 @@ export function useLiveSession() {
       if (prev.some((t) => t.turn === turnEvent.turn)) return prev;
       return [...prev, { ...turnEvent, displayTime: currentTimestamp }];
     });
+    if (!isAudioOwnerRef.current) return;
     if (turnEvent.audio_url) {
       audioQueueRef.current.push({
         type: 'turn',
@@ -265,6 +293,13 @@ export function useLiveSession() {
       setIsSkipping(false);
     }
   };
+
+  // While monitoring, there is no local audio clock: tick the slot timer.
+  useEffect(() => {
+    if (isAudioOwner || sessionStatus.state !== 'running' || !currentSlot) return undefined;
+    const timer = setInterval(() => setSlotElapsedSec((p) => p + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isAudioOwner, sessionStatus.state, currentSlot]);
 
   useEffect(() => {
     if (sessionStatus.state === 'running') {
@@ -396,5 +431,7 @@ export function useLiveSession() {
     currentSlot,
     musicTrack,
     cueSlot,
+    isAudioOwner,
+    stageConnected,
   };
 }

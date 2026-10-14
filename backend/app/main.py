@@ -729,6 +729,16 @@ async def websocket_session_endpoint(websocket: WebSocket, role: str = "console"
                         continue
                     if clock_runner_instance:
                         clock_runner_instance.playback_feedback(cmd.get("data", {}))
+                elif cmd.get("action") == "speaking":
+                    # The audio owner reports who is audible so muted consoles
+                    # can still light the right speaker card.
+                    if websocket is not ws_manager.audio_owner():
+                        continue
+                    persona = (cmd.get("data") or {}).get("persona")
+                    await ws_manager.broadcast_json({
+                        "type": "speaking",
+                        "data": {"persona": persona if persona in ("persona_a", "persona_b") else None},
+                    })
             except Exception as e:
                 logger.warning("WS command error: %s", e)
     except WebSocketDisconnect:
