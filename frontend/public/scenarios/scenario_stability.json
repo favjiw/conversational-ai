@@ -1,0 +1,30 @@
+{
+  "id": "stabilitas-panjang-01",
+  "title": "Uji Stabilitas dan Performa Panjang",
+  "characters": {
+    "persona_a": {
+      "name": "Raka",
+      "model": "models/red-male.vrm",
+      "voice": "Microsoft David Desktop"
+    },
+    "persona_b": {
+      "name": "Salsa",
+      "model": "models/female.vrm",
+      "voice": "Microsoft Zira Desktop"
+    }
+  },
+  "turns": [
+    { "persona": "persona_a", "text": "Cycle 1: Starting stability benchmark test for dual VRM characters.", "emotion": "neutral", "audio": "audio/scenarios/s1_t1.wav" },
+    { "persona": "persona_b", "text": "Cycle 1: Salsa reporting online. Monitoring frame rate and memory allocations.", "emotion": "happy", "audio": "audio/scenarios/s1_t2.wav" },
+    { "persona": "persona_a", "text": "Cycle 2: Checking lipsync mouth responsiveness and expression interpolation.", "emotion": "excited", "audio": "audio/scenarios/s2_t1.wav" },
+    { "persona": "persona_b", "text": "Cycle 2: Procedural idle animations running smoothly without stuttering.", "emotion": "thoughtful", "audio": "audio/scenarios/s2_t4.wav" },
+    { "persona": "persona_a", "text": "Cycle 3: Testing surprise reaction and fast eyebrow transitions.", "emotion": "surprised", "audio": "audio/scenarios/s2_t3.wav" },
+    { "persona": "persona_b", "text": "Cycle 3: Evaluating empathetic nod and smooth blink cycles.", "emotion": "empathetic", "audio": "audio/scenarios/s2_t6.wav" },
+    { "persona": "persona_a", "text": "Cycle 4: Sustained audio analysis running continuously through Web Audio API.", "emotion": "neutral", "audio": "audio/scenarios/s1_t3.wav" },
+    { "persona": "persona_b", "text": "Cycle 4: Draw calls and vertex counts remain stable across frames.", "emotion": "happy", "audio": "audio/scenarios/s1_t4.wav" },
+    { "persona": "persona_a", "text": "Cycle 5: We are maintaining 60 frames per second on the 3D scene.", "emotion": "excited", "audio": "audio/scenarios/s2_t7.wav" },
+    { "persona": "persona_b", "text": "Cycle 5: Memory leak inspection confirms zero dangling node allocations.", "emotion": "thoughtful", "audio": "audio/scenarios/s2_t2.wav" },
+    { "persona": "persona_a", "text": "Cycle 6: Repeating benchmark validation loop to verify long-term stability.", "emotion": "neutral", "audio": "audio/scenarios/s1_t1.wav" },
+    { "persona": "persona_b", "text": "Cycle 6: Ready for next sequence. Avatar prototype performs within spec.", "emotion": "happy", "audio": "audio/scenarios/s2_t6.wav" }
+  ]
+}

@@ -58,6 +58,8 @@ backend/cache/
 *.mp3
 *.wav
 *.ogg
+!frontend/public/audio/
+!frontend/public/audio/**
 
 # Node / Frontend
 node_modules/
