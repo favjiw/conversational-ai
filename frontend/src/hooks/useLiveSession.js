@@ -83,7 +83,7 @@ export function useLiveSession() {
 
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/session`;
+    const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/session?role=console`;
     wsRef.current = new WebSocket(wsUrl);
 
     wsRef.current.onopen = () => setWsConnected(true);

@@ -69,20 +69,64 @@ app.add_middleware(
 
 # ── WebSocket Manager ────────────────────────────────────────────────────────
 
-class ConnectionManager:
-    """Manages active WebSocket connections for live session streaming."""
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+CLIENT_ROLES = ("console", "stage")
 
-    async def connect(self, websocket: WebSocket):
+
+class ConnectionManager:
+    """Manages active WebSocket connections for live session streaming.
+
+    Each client declares a role: ``console`` (operator page "/") or ``stage``
+    (program output "/stage"). Exactly one connected client is the audio
+    owner: the oldest stage if any is connected, otherwise the oldest console.
+    Only the audio owner should play audio, and only its playback feedback
+    advances the clock runner.
+    """
+    def __init__(self):
+        # Insertion order = connection order, used for owner election.
+        self.active_connections: dict[WebSocket, str] = {}
+
+    async def connect(self, websocket: WebSocket, role: str = "console"):
         await websocket.accept()
-        self.active_connections.append(websocket)
-        logger.info("WebSocket client connected. Total: %d", len(self.active_connections))
+        self.active_connections[websocket] = role if role in CLIENT_ROLES else "console"
+        logger.info(
+            "WebSocket client connected (role=%s). Total: %d",
+            self.active_connections[websocket], len(self.active_connections),
+        )
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-            logger.info("WebSocket client disconnected. Total: %d", len(self.active_connections))
+            role = self.active_connections.pop(websocket)
+            logger.info("WebSocket client disconnected (role=%s). Total: %d", role, len(self.active_connections))
+
+    def audio_owner(self) -> Optional[WebSocket]:
+        for role in ("stage", "console"):
+            for ws, ws_role in self.active_connections.items():
+                if ws_role == role:
+                    return ws
+        return None
+
+    def output_status_for(self, websocket: WebSocket) -> dict[str, Any]:
+        roles = list(self.active_connections.values())
+        owner = self.audio_owner()
+        return {
+            "role": self.active_connections.get(websocket, "console"),
+            "is_audio_owner": websocket is owner,
+            "audio_owner_role": self.active_connections.get(owner) if owner else None,
+            "stage_connected": "stage" in roles,
+            "clients": {role: roles.count(role) for role in CLIENT_ROLES},
+        }
+
+    async def broadcast_output_status(self):
+        """Send every client its own view of the output routing."""
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json({
+                    "type": "output_status",
+                    "data": self.output_status_for(connection),
+                })
+            except Exception as e:
+                logger.warning("Error sending WS message: %s", e)
+                self.disconnect(connection)
 
     async def broadcast_json(self, data: dict[str, Any]):
         for connection in list(self.active_connections):
@@ -663,13 +707,15 @@ def get_log_content(session_id: str):
     return lines
 
 @app.websocket("/ws/session")
-async def websocket_session_endpoint(websocket: WebSocket):
-    await ws_manager.connect(websocket)
+async def websocket_session_endpoint(websocket: WebSocket, role: str = "console"):
+    previous_owner = ws_manager.audio_owner()
+    await ws_manager.connect(websocket, role)
     try:
         await websocket.send_json({
             "type": "status",
             "data": {"state": current_state.value, "session_id": current_session_id},
         })
+        await _on_output_routing_changed(previous_owner)
         while True:
             data = await websocket.receive_text()
             try:
@@ -677,11 +723,24 @@ async def websocket_session_endpoint(websocket: WebSocket):
                 if cmd.get("action") == "ping":
                     await websocket.send_json({"type": "pong"})
                 elif cmd.get("action") == "playback_feedback":
-                    # Forward playback feedback to ClockRunner
-                    global clock_runner_instance
+                    # Only the audio owner's playback drives the ClockRunner;
+                    # feedback from muted monitors is ignored.
+                    if websocket is not ws_manager.audio_owner():
+                        continue
                     if clock_runner_instance:
                         clock_runner_instance.playback_feedback(cmd.get("data", {}))
             except Exception as e:
                 logger.warning("WS command error: %s", e)
     except WebSocketDisconnect:
+        pass
+    finally:
+        previous_owner = ws_manager.audio_owner()
         ws_manager.disconnect(websocket)
+        await _on_output_routing_changed(previous_owner)
+
+
+async def _on_output_routing_changed(previous_owner: Optional[WebSocket]) -> None:
+    """Notify clients of the routing, and unblock audio the old owner never finished."""
+    if ws_manager.audio_owner() is not previous_owner and clock_runner_instance:
+        clock_runner_instance.release_pending_playback("audio owner changed")
+    await ws_manager.broadcast_output_status()

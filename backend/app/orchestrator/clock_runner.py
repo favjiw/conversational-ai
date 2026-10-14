@@ -198,6 +198,13 @@ class ClockRunner:
             self._playback_error = data.get("message") or "Audio playback failed"
             self._playback_done.set()
 
+    def release_pending_playback(self, reason: str) -> None:
+        """Treat the audio in flight as finished, e.g. when the client playing it
+        is no longer the audio owner and its feedback would never arrive."""
+        if self._playback_id is not None and not self._playback_done.is_set():
+            logger.info("Releasing pending playback %s: %s", self._playback_id, reason)
+            self._playback_done.set()
+
     async def _play_audio(self, event_type: str, data: dict[str, Any]) -> None:
         self._playback_sequence += 1
         self._playback_id = f"{self._generation}:{self._playback_sequence}"
