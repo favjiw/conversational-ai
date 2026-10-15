@@ -6,7 +6,7 @@ export default function FormatPresetSelector({ preset, setPreset, isRunning }) {
       id: 'clock_pagi_bener',
       label: 'Clock Live HITS',
       badge: '1 Jam HITS',
-      desc: '39 Slot (11 Lagu Deezer, 6 Talk, 6 Adlibs, Smash/Jingle)',
+      desc: '42 Slot (11 Lagu Deezer, 7 Talk AI, 6 Adlibs, Jingle/Bumper)',
       badgeColor: 'bg-rose-100 text-rose-800 font-bold',
       featured: true,
     },

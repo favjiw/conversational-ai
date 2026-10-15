@@ -348,6 +348,9 @@ class EdgeTTSProvider(TTSProvider):
         self._male_pitch = male_pitch
         self._elevenlabs_key = elevenlabs_fallback_key
         self._elevenlabs_model = elevenlabs_fallback_model
+        # Set once ElevenLabs rejects the key or quota: stop paying a failed
+        # round trip on every turn and go straight to Edge.
+        self._elevenlabs_disabled = False
 
     async def synthesize(self, text: str, voice: str) -> bytes:
         import edge_tts
@@ -356,12 +359,17 @@ class EdgeTTSProvider(TTSProvider):
         is_female = False
 
         # Support direct ElevenLabs voice ID if user configures one
-        if len(voice_id) >= 18 and voice_id.isalnum() and "-" not in voice_id and self._elevenlabs_key:
+        if (len(voice_id) >= 18 and voice_id.isalnum() and "-" not in voice_id
+                and self._elevenlabs_key and not self._elevenlabs_disabled):
             try:
                 el_provider = ElevenLabsTTSProvider(api_key=self._elevenlabs_key, model_id=self._elevenlabs_model)
                 return await el_provider.synthesize(text, voice_id)
             except Exception as e:
-                logger.warning("ElevenLabs fallback failed for voice '%s', falling back to Edge TTS: %s", voice_id, e)
+                if any(f"({code})" in str(e) for code in (401, 402, 403)):
+                    self._elevenlabs_disabled = True
+                    logger.warning("ElevenLabs rejected the key/quota; using Edge TTS only from now on: %s", e)
+                else:
+                    logger.warning("ElevenLabs fallback failed for voice '%s', falling back to Edge TTS: %s", voice_id, e)
 
         if not voice_id or voice_id in ("male_voice", "male", "persona_a", "raka"):
             voice_id = self._default_male

@@ -1,38 +1,57 @@
 {
-  "s08": {
-    "title": "Talk 1 - HITS News",
+  "_note": "Kunci = id slot di clock-pagi-bener-live-1jam.json. Isi masih contoh sementara sampai Tema .docx dari produser di-parsing (docs/STRUKTUR-TEMA-HITS.md). Kunci tanpa slot (hits_news, traffic_info) dicadangkan sampai News/Traffic diputuskan masuk rundown.",
+  "s07": {
+    "title": "Ice Breaking",
+    "mode": "improv",
+    "content": "Pemanasan pagi: kebiasaan kecil yang bikin semangat berangkat, misalnya sarapan favorit atau lagu yang wajib diputar pagi-pagi.",
+    "guidance": "Pembuka singkat sekitar 30 detik, satu topik ringan, belum masuk materi utama."
+  },
+  "s10": {
+    "title": "Talk 1 - Opening",
+    "mode": "improv",
+    "content": "Pembukaan Pagi Bener di 103.9 HITS Unikom Radio. Penyiar siaran ini adalah AI. Hari ini ada Say Hi, segmen 3M, dan SKEMA.",
+    "guidance": "Sapa pendengar, perkenalkan diri sebagai penyiar AI, lalu sebutkan segmen yang akan hadir. Singkat, sekitar 1 menit."
+  },
+  "s13": {
+    "title": "Talk 2 - Say Hi!",
+    "mode": "listener_content",
+    "content": "Materi: Serba-serbi Ospek. Pesan pendengar: \"Kak, aku maba, besok hari pertama ospek, deg-degan banget. Ada tips biar nggak canggung?\"",
+    "guidance": "Bacakan pesan pendengar, bereaksi, lalu ngobrol soal pengalaman dan tips ospek dari sudut pandang masing-masing. Ingatkan pendengar kirim salam lewat komentar sekali saja."
+  },
+  "s21": {
+    "title": "Talk 3 - Teaser 3M",
+    "mode": "improv",
+    "content": "Segmen 3M (Mencoba Mengerti Mahasiswa) hadir sebentar lagi: pendengar kirim pertanyaan nyeleneh seputar kuliah, dijawab Pak Dosen Agung dan Asdos Akri.",
+    "guidance": "Teaser segmen 3M, ajak pendengar kirim pertanyaan nyeleneh lewat komentar. Cukup sekali ajakan."
+  },
+  "s30": {
+    "title": "Talk 4 - 3M",
+    "mode": "listener_content",
+    "content": "Pertanyaan pendengar: \"Pak, kalau saya titip absen ke teman tapi temannya juga titip absen ke saya, yang hadir siapa?\"",
+    "guidance": "Raka berperan sebagai Pak Dosen Agung, Salsa sebagai Asdos Akri. Bacakan pertanyaan, jawab dengan gaya dosen dan asdos yang lucu tapi tetap sopan. Pergantian peran ini diminta Tema."
+  },
+  "s40": {
+    "title": "Talk 5 - Konten / SKEMA",
+    "mode": "improv",
+    "content": "SKEMA: sketsa melamar kerja di restoran. Cut 1: pelamar datang telat. Cut 2: wawancara dengan manajer yang aneh. Cut 3: hasil wawancara yang tidak terduga.",
+    "guidance": "Raka berperan sebagai pelamar, Salsa sebagai manajer restoran. Ikuti alur per cut, jaga benang merah cerita, hindari kata kasar. Pergantian peran ini diminta Tema."
+  },
+  "s41": {
+    "title": "Closing",
+    "mode": "improv",
+    "content": "Pamitan Pagi Bener hari ini, terima kasih untuk penonton live, dan ajakan nonton live berikutnya.",
+    "guidance": "Pamitan hangat dan singkat, sebutkan terima kasih dan jadwal live berikutnya."
+  },
+  "hits_news": {
+    "title": "HITS News",
     "mode": "scripted",
     "content": "Berita pagi: gempa magnitudo 4.6 mengguncang Kabupaten Bandung dini hari tadi, tidak berpotensi tsunami. Dinas Pendidikan Kota Bandung membuka pendaftaran beasiswa prestasi untuk mahasiswa. Agenda kampus: HITS Unikom Radio mengadakan open recruitment penyiar baru pekan ini.",
     "guidance": "Bacakan berita singkat dengan jelas, lalu beri satu reaksi atau pendapat singkat dari masing-masing penyiar."
   },
-  "s10": {
-    "title": "Talk 2 - Traffic Info",
+  "traffic_info": {
+    "title": "Traffic Info",
     "mode": "scripted",
     "content": "Update arus lalu lintas: Jalan Dipatiukur padat merayap arah Dago, kepadatan di persimpangan Surapati. Jalan Pasteur ramai lancar. Jalan Dago arah Simpang macet karena perbaikan drainase. Pengendara disarankan lewat jalur alternatif Cihampelas.",
     "guidance": "Sampaikan info lalu lintas dengan jelas, lalu beri tips berkendara aman untuk pendengar yang berangkat pagi."
-  },
-  "s19": {
-    "title": "Talk 3 - Teaser 3M",
-    "mode": "improv",
-    "content": "Segmen Masalah, Musik, dan Motivasi akan hadir. Pendengar bisa kirim curhat masalah pagi hari lewat kolom komentar live.",
-    "guidance": "Teaser segmen 3M, ajak pendengar ikut kirim curhat sekali saja, jangan berlebihan."
-  },
-  "s28": {
-    "title": "Talk 4 - 3M Curhat",
-    "mode": "listener_content",
-    "content": "Curhat pendengar: susah bangun pagi karena begadang, takut telat kuliah, dan drama tugas skripsi yang belum kelar. Pendengar butuh motivasi memulai hari.",
-    "guidance": "Bahas curhat pendengar dengan empati, kasih pendapat dan solusi santai dari sudut pandang masing-masing."
-  },
-  "s36": {
-    "title": "Talk 5 - 3M Solusi",
-    "mode": "listener_content",
-    "content": "Lanjutan solusi untuk curhat pendengar: tips bangun pagi, atur waktu skripsi, dan semangat menjalani hari.",
-    "guidance": "Kasih solusi dan motivasi penutup segmen 3M, tutup dengan hangat."
-  },
-  "s38": {
-    "title": "Closing + Selling Next Live",
-    "mode": "scripted",
-    "content": "Pamitan siaran Pagi Bener hari ini, terima kasih untuk pendengar, dan ajakan dengar siaran besok pagi jam 7.",
-    "guidance": "Pamitan yang hangat, sebutkan terima kasih dan nantikan siaran besok."
   }
 }

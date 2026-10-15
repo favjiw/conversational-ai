@@ -36,6 +36,8 @@ class SlotType(str, Enum):
     TALK = "talk"
     TIME_MARKER = "time_marker"
     SELLING_NEXT_HOUR = "selling_next_hour"
+    BUMPER = "bumper"
+    TAPING = "taping"
 
 
 class SlotSource(str, Enum):

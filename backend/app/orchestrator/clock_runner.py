@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 import re
 import time
 from pathlib import Path
@@ -27,6 +28,7 @@ from app.schemas import (
     PersonaCard,
     SessionState,
     Slot,
+    SlotSource,
     SlotType,
     Tema,
     TemaMode,
@@ -69,29 +71,21 @@ SAMPLE_ADLIBS = [
     "Tetap aman berkendara di jalan raya Bandung, patuhi rambu lalu lintas dan nyalakan lampu utama!",
 ]
 
-CUE_VOICE_SCRIPTS = {
-    "s01": "103.9 HITS Unikom Radio! Musik terbaik anak muda Bandung.",
-    "s02": "Tepat pukul 07.00 Waktu Indonesia Barat. Selamat pagi Bandung, dengerin terus Pagi Bener!",
-    "s03": "HITS Unikom Radio, Jalan Dipatiukur Nomor 112 Bandung. Streaming live tiap pagi!",
-    "s04": "Layanan masyarakat HITS FM: Selalu tertib berlalu lintas di jalan raya Bandung dan utamakan keselamatan bersama.",
-    "s05": "Halo sobat HITS, saya Afgan! Terus dengerin lagu-lagu hits favorit kamu cuma di 103.9 FM Bandung!",
-    "s06": "HITS Mashup! Musik tanpa henti hanya di Pagi Bener!",
-    "s11": "103.9 HITS FM Bandung, The Real Youth Radio!",
-    "s13": "HITS Station ID, energi kreatif anak muda Bandung!",
-    "s20": "Pagi Bener! Masalah, Musik, dan Motivasi!",
-    "s29": "103.9 HITS Unikom Radio, suara generasi muda!",
-    "s37": "HITS Radio Bandung, sahabat setia pagi ceriamu!",
-}
+# Station-owned recordings (jingles, bumpers, tapings, ...). Clock slots with
+# source=static_audio reference a file here by name in `asset`. The files are
+# not committed; see data/station_audio/README.md.
+STATION_AUDIO_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "station_audio"
+STATION_AUDIO_URL_PREFIX = "/station-audio"
+STATION_AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a"}
 
 
-TALK_DEFAULT_TOPICS = {
-    "s08": ("HITS News", "Berita terkini seputar tren gaya hidup, musik baru, dan agenda kampus Bandung pagi ini."),
-    "s10": ("Traffic Info", "Update arus lalu lintas seputar jalan Dipatiukur, Dago, Pasteur, dan Surapati Bandung."),
-    "s19": ("Teaser 3M", "Teaser segmen Masalah, Musik, dan Motivasi. Siap-siap dengerin curhat pendengar seru."),
-    "s28": ("Segmen 3M Curhat", "Membahas curhat pendengar tentang tantangan bangun pagi, skripsi, dan kerjaan kantor."),
-    "s36": ("Segmen 3M Solusi", "Lanjutan solusi santai dan motivasi semangat menjalani hari dari Raka dan Salsa."),
-    "s38": ("Closing & Next Live", "Pamitan siaran Pagi Bener hari ini, terima kasih pendengar dan nantikan siaran besok jam 7 pagi!"),
-}
+def resolve_station_audio(asset: Optional[str]) -> Optional[Path]:
+    """Return the file for an asset name, or None if missing or not a plain filename."""
+    if not asset or Path(asset).name != asset or Path(asset).suffix.lower() not in STATION_AUDIO_EXTENSIONS:
+        return None
+    path = STATION_AUDIO_DIR / asset
+    return path if path.is_file() else None
+
 
 # Tema library path (PRD v1.1 FR-8)
 TEMA_LIBRARY_PATH = Path(__file__).resolve().parent.parent / "data" / "tema"
@@ -111,6 +105,8 @@ def load_tema_library() -> dict[str, Tema]:
             logger.warning("Failed to read tema library %s", f)
             continue
         for slot_id, entry in data.items():
+            if slot_id.startswith("_"):
+                continue  # comments such as "_note"
             try:
                 library[slot_id] = Tema(
                     title=entry.get("title", slot_id),
@@ -121,6 +117,24 @@ def load_tema_library() -> dict[str, Tema]:
             except Exception as e:
                 logger.warning("Invalid tema entry %s: %s", slot_id, e)
     return library
+
+
+@dataclass
+class PreparedLine:
+    """An announcer line with its TTS audio already rendered."""
+    speaker: PersonaCard
+    text: str
+    emotion: str
+    audio_url: Optional[str]
+    duration_sec: float
+
+
+@dataclass
+class PreparedSong:
+    """Everything a song slot needs, built ahead of time so it starts instantly."""
+    track: MusicTrack
+    intro: PreparedLine
+    outro: PreparedLine
 
 
 class ClockRunner:
@@ -160,6 +174,12 @@ class ClockRunner:
         self._pause_event.set()
         self._stop_requested = False
         self._total_turns = 0
+        self._tts_sequence = 0
+        # Last clock_slot_started event, replayed to clients that connect mid-rundown.
+        self.last_slot_event: Optional[dict[str, Any]] = None
+        # Song slots are prepared one song ahead (slot id -> task), so the
+        # Deezer search, intro/backsell LLM text and TTS are ready on air.
+        self._song_prep: dict[str, asyncio.Task] = {}
         self._slot_task = None
         self._run_task = None
         self._skip_requested = False
@@ -180,11 +200,14 @@ class ClockRunner:
         return self._current_slot_idx
 
     async def emit_event(self, event_type: str, data: dict[str, Any]) -> None:
+        event = {"type": event_type, "data": {
+            **data, "session_id": self._session_id,
+            "generation": self._generation,
+        }}
+        if event_type == "clock_slot_started":
+            self.last_slot_event = event
         if self.broadcast:
-            await self.broadcast({"type": event_type, "data": {
-                **data, "session_id": self._session_id,
-                "generation": self._generation,
-            }})
+            await self.broadcast(event)
 
     def playback_feedback(self, data: dict[str, Any]) -> None:
         """Accept only feedback for the current audio and slot revision."""
@@ -283,6 +306,7 @@ class ClockRunner:
             if self._slot_task and not self._slot_task.done():
                 self._slot_task.cancel()
                 
+            self._cancel_song_prep()
             self._playback_done.set()
             self._state = SessionState.FINISHED
             await self.emit_event("status", {"state": "idle", "session_id": self._session_id})
@@ -302,6 +326,7 @@ class ClockRunner:
 
                 self._current_slot_idx = idx
                 self._skip_requested = False
+                self._schedule_song_prep(idx)
 
                 await self.emit_event("clock_slot_started", {
                     "slot_index": idx,
@@ -349,20 +374,43 @@ class ClockRunner:
 
     async def _dispatch_slot(self, slot: Slot, idx: int) -> None:
         if slot.type == SlotType.SONG:
-            await self._handle_song_slot(slot)
-        elif slot.type == SlotType.TALK:
+            await self._handle_song_slot(slot, idx)
+        elif slot.type == SlotType.TALK or slot.source == SlotSource.LLM_CONVERSATION:
+            # Talk segments and other improvised slots (e.g. Ice Breaking)
             await self._handle_talk_slot(slot)
         elif slot.type == SlotType.SPOT_ADLIBS:
             await self._handle_adlibs_slot(slot, idx)
         elif slot.type == SlotType.TIME_MARKER:
             await self._handle_time_marker_slot(slot)
+        elif slot.source == SlotSource.STATIC_AUDIO:
+            await self._handle_static_audio_slot(slot)
         else:
             await self._handle_cue_slot(slot)
 
-    async def _handle_song_slot(self, slot: Slot) -> None:
+    def _schedule_song_prep(self, idx: int) -> None:
+        """Start preparing the first song slot at or after ``idx`` (one ahead)."""
+        for ahead_idx in range(idx, len(self.clock.slots)):
+            slot = self.clock.slots[ahead_idx]
+            if slot.type == SlotType.SONG:
+                if slot.id not in self._song_prep:
+                    self._song_prep[slot.id] = asyncio.create_task(self._prepare_song(slot, ahead_idx))
+                return
+
+    def _cancel_song_prep(self) -> None:
+        for task in self._song_prep.values():
+            task.cancel()
+        self._song_prep.clear()
+
+    async def _prepare_song(self, slot: Slot, idx: int) -> PreparedSong:
         category = slot.category or "indo_hits"
-        logger.info("Song slot %s category=%s", slot.id, category)
-        tracks = await self.music.search(category=category, limit=3)
+        logger.info("Preparing song slot %s category=%s", slot.id, category)
+        started = time.perf_counter()
+
+        tracks: list[MusicTrack] = []
+        try:
+            tracks = await self.music.search(category=category, limit=3)
+        except Exception as e:
+            logger.warning("Music search failed for %s: %s", slot.id, e)
         track = tracks[0] if tracks else MusicTrack(
             id=f"track_{slot.id}",
             title=f"Lagu Hits ({category})",
@@ -372,67 +420,77 @@ class ClockRunner:
         )
 
         cat_clean = category.replace("_", " ").title()
-        intro_speaker = self.persona_a if (self._total_turns % 2 == 0) else self.persona_b
+        intro_speaker = self.persona_a if idx % 2 == 0 else self.persona_b
+        outro_speaker = self.persona_b if intro_speaker is self.persona_a else self.persona_a
 
-        # 1. LLM Host Announcer Bicara Intro Lagu
-        intro_text = (
+        intro_fallback = (
             f"Nah sekarang giliran lagu hits {cat_clean}! Kita puterin buat kamu {track.artist} "
             f"dengan lagu {track.title}. Selamat dengerin sobat HITS!"
         )
-        if self.llm:
-            try:
-                llm_res = await self.llm.generate(
-                    prompt=(
-                        f"Kamu {intro_speaker.name}, penyiar 103.9 HITS Radio Bandung. "
-                        f"Kenalkan lagu hits berikutnya yang akan diputar: '{track.title}' oleh {track.artist} (kategori: {cat_clean}). "
-                        f"Bicara 1-2 kalimat gaya santai gaul ceria anak muda Bandung.\n"
-                        f"ATURAN KETAT: DILARANG menyertakan emoji atau simbol apapun (seperti petir, musik, api). "
-                        f"DILARANG menyertakan tanda kurung atau petik. HANYA kata-kata lisan siaran murni."
-                    ),
-                    system_instruction="Kamu adalah penyiar radio Bandung yang gaul dan ceria. Jangan pernah gunakan emoji.",
-                )
-                if llm_res.raw and len(llm_res.raw.strip()) > 5:
-                    intro_text = llm_res.raw.strip()
-            except Exception as e:
-                logger.warning("LLM intro generation fallback: %s", e)
-
-        # Tunggu sampai penyiar selesai bicara intro
-        await self._speak_turn(slot.id, intro_speaker, intro_text, emotion="happy", wait_spoken=True)
-
-        # 2. Putar Preview Deezer MP3
-        wait_sec = min(self.demo_music_sec, slot.nominal_sec or 30)
-        await self._play_audio("clock_music", {
-            "slot_id": slot.id,
-            "category": category,
-            "track": track.model_dump(),
-            "preview_sec": wait_sec,
-        })
-
-        # 3. LLM Host Announcer Bicara Outro / Backsell Lagu
-        outro_speaker = self.persona_b if intro_speaker == self.persona_a else self.persona_a
-        outro_text = (
+        outro_fallback = (
             f"Keren banget lagu dari {track.artist} barusan! Masih di 103.9 HITS FM Pagi Bener, "
             f"stay tuned terus bareng {self.persona_a.name} dan {self.persona_b.name}!"
         )
-        if self.llm:
-            try:
-                llm_res = await self.llm.generate(
-                    prompt=(
-                        f"Kamu {outro_speaker.name}, penyiar 103.9 HITS Radio Bandung. "
-                        f"Beri komentar 1 kalimat menikmati lagu '{track.title}' dari {track.artist} yang baru saja selesai diputar. "
-                        f"Lalu ajak pendengar tetap stay tuned di 103.9 HITS Radio.\n"
-                        f"ATURAN KETAT: DILARANG menyertakan emoji atau simbol apapun. "
-                        f"DILARANG menyertakan tanda kurung atau petik. HANYA kata-kata lisan siaran murni."
-                    ),
-                    system_instruction="Kamu adalah penyiar radio Bandung yang gaul dan ceria. Jangan pernah gunakan emoji.",
-                )
-                if llm_res.raw and len(llm_res.raw.strip()) > 5:
-                    outro_text = llm_res.raw.strip()
-            except Exception as e:
-                logger.warning("LLM outro generation fallback: %s", e)
+        rules = (
+            "ATURAN KETAT: DILARANG menyertakan emoji atau simbol apapun (seperti petir, musik, api). "
+            "DILARANG menyertakan tanda kurung atau petik. HANYA kata-kata lisan siaran murni."
+        )
+        intro_prompt = (
+            f"Kamu {intro_speaker.name}, penyiar 103.9 HITS Radio Bandung. "
+            f"Kenalkan lagu hits berikutnya yang akan diputar: '{track.title}' oleh {track.artist} (kategori: {cat_clean}). "
+            f"Bicara 1-2 kalimat gaya santai gaul ceria anak muda Bandung.\n{rules}"
+        )
+        outro_prompt = (
+            f"Kamu {outro_speaker.name}, penyiar 103.9 HITS Radio Bandung. "
+            f"Beri komentar 1 kalimat menikmati lagu '{track.title}' dari {track.artist} yang baru saja selesai diputar. "
+            f"Lalu ajak pendengar tetap stay tuned di 103.9 HITS Radio.\n{rules}"
+        )
 
-        # Tunggu sampai penyiar selesai bicara outro
-        await self._speak_turn(slot.id, outro_speaker, outro_text, emotion="happy", wait_spoken=True)
+        # Intro and backsell are independent: write and voice them in parallel.
+        intro_text, outro_text = await asyncio.gather(
+            self._generate_line(intro_prompt, intro_fallback),
+            self._generate_line(outro_prompt, outro_fallback),
+        )
+        intro, outro = await asyncio.gather(
+            self._synthesize_line(intro_speaker, intro_text, "happy"),
+            self._synthesize_line(outro_speaker, outro_text, "happy"),
+        )
+        logger.info("Song slot %s ready in %.1fs (%s - %s)",
+                    slot.id, time.perf_counter() - started, track.artist, track.title)
+        return PreparedSong(track=track, intro=intro, outro=outro)
+
+    async def _generate_line(self, prompt: str, fallback: str) -> str:
+        if not self.llm:
+            return fallback
+        try:
+            res = await self.llm.generate(
+                prompt=prompt,
+                system_instruction="Kamu adalah penyiar radio Bandung yang gaul dan ceria. Jangan pernah gunakan emoji.",
+            )
+            if res.raw and len(res.raw.strip()) > 5:
+                return res.raw.strip()
+        except Exception as e:
+            logger.warning("LLM song line fallback: %s", e)
+        return fallback
+
+    async def _handle_song_slot(self, slot: Slot, idx: int) -> None:
+        task = self._song_prep.pop(slot.id, None)
+        if task is None:
+            task = asyncio.create_task(self._prepare_song(slot, idx))
+        # Shield: a skip cancels this handler, not the shared preparation.
+        prepared = await asyncio.shield(task)
+
+        await self._play_line(slot.id, prepared.intro, wait_spoken=True)
+
+        wait_sec = min(self.demo_music_sec, slot.nominal_sec or 30)
+        await self._play_audio("clock_music", {
+            "slot_id": slot.id,
+            "category": slot.category or "indo_hits",
+            "track": prepared.track.model_dump(),
+            "preview_sec": wait_sec,
+        })
+
+        await self._play_line(slot.id, prepared.outro, wait_spoken=True)
 
     async def _handle_talk_slot(self, slot: Slot) -> None:
         # Prefer slot.tema (from clock) then the tema library, then fallback (FR-8)
@@ -449,10 +507,8 @@ class ClockRunner:
                 tema = lib_entry
 
         if tema is None:
-            title, guidance = TALK_DEFAULT_TOPICS.get(
-                slot.id, (slot.label or "Obrolan Pagi Bener", "Obrolan santai penyiar")
-            )
-            tema = Tema(title=title, mode=TemaMode.IMPROV, content=guidance, guidance=guidance)
+            title = slot.label or "Obrolan Pagi Bener"
+            tema = Tema(title=title, mode=TemaMode.IMPROV, content=title, guidance="Obrolan santai penyiar")
         async def on_turn(turn_log) -> None:
             speaker = self.persona_a if turn_log.persona == self.persona_a.id else self.persona_b
             emotion_str = turn_log.emotion.value if hasattr(turn_log.emotion, "value") else str(turn_log.emotion)
@@ -477,48 +533,50 @@ class ClockRunner:
     async def _handle_adlibs_slot(self, slot: Slot, idx: int) -> None:
         adlib_text = SAMPLE_ADLIBS[idx % len(SAMPLE_ADLIBS)]
         speaker = self.persona_a if (idx % 2 == 0) else self.persona_b
-        formatted_text = f"📢 [ADLIBS / SPONSOR] {adlib_text}"
-        await self._speak_turn(slot.id, speaker, formatted_text, emotion="excited", wait_spoken=True)
+        await self._speak_turn(slot.id, speaker, adlib_text, emotion="excited", wait_spoken=True)
+
+    async def _handle_static_audio_slot(self, slot: Slot) -> None:
+        """Play a pre-recorded station element (jingle, bumper, taping, ...).
+
+        The announcers stay silent: these elements are never voiced by TTS.
+        A slot whose recording is not available is skipped.
+        """
+        label = slot.label or slot.type.value
+        path = resolve_station_audio(slot.asset)
+        if path is None:
+            logger.info("Static audio slot %s (%s) has no recording (%r); skipping", slot.id, label, slot.asset)
+            await self.emit_event("clock_cue", {
+                "slot_id": slot.id,
+                "type": slot.type.value,
+                "label": label,
+                "skipped": True,
+            })
+            return
+
+        await self._play_audio("clock_audio", {
+            "slot_id": slot.id,
+            "slot_type": slot.type.value,
+            "label": label,
+            "audio_url": f"{STATION_AUDIO_URL_PREFIX}/{path.name}",
+        })
 
     async def _handle_cue_slot(self, slot: Slot) -> None:
-        cue_text = CUE_VOICE_SCRIPTS.get(
-            slot.id,
-            f"103.9 HITS Radio Bandung! {slot.label or slot.type.value}"
-        )
-        speaker = self.persona_b
-        label_clean = slot.label or slot.type.value
-        dur = await self._speak_turn(slot.id, speaker, f"⚡ [{label_clean}] {cue_text}", emotion="excited", wait_spoken=True)
-
-        await self.emit_event("clock_cue", {
-            "slot_id": slot.id,
-            "type": slot.type.value,
-            "label": label_clean,
-            "nominal_sec": slot.nominal_sec or round(dur),
-        })
-        # If nominal stager has slight trailing music padding (capped at 3s)
-        rem_sec = max(0.0, min(3.0, (slot.nominal_sec or 0) - dur))
-        if rem_sec > 0:
-            await self._sleep_cancellable(rem_sec)
+        """Non-talk slot voiced by an announcer from its scripted `tts_text`."""
+        if not slot.tts_text:
+            logger.info("Cue slot %s has no tts_text; skipping", slot.id)
+            return
+        await self._speak_turn(slot.id, self.persona_b, slot.tts_text, emotion="excited", wait_spoken=True)
 
     async def _handle_time_marker_slot(self, slot: Slot) -> None:
-        target = slot.target_min or 0
-        marker_text = f"⏰ Checkpoint Siaran: Tepat pukul 07.{target:02d} WIB di 103.9 HITS Unikom Radio!"
-        await self._speak_turn(slot.id, self.persona_a, marker_text, emotion="happy", wait_spoken=True)
+        # A marker only aligns the rundown to the clock; nothing goes on air.
         await self.emit_event("clock_time_marker", {
             "slot_id": slot.id,
             "label": slot.label or "Checkpoint",
             "target_min": slot.target_min,
         })
 
-    async def _speak_turn(
-        self,
-        slot_id: str,
-        speaker: PersonaCard,
-        text: str,
-        emotion: str = "neutral",
-        wait_spoken: bool = True,
-    ) -> float:
-        self._total_turns += 1
+    async def _synthesize_line(self, speaker: PersonaCard, text: str, emotion: str) -> PreparedLine:
+        """Render TTS for a line without putting it on air."""
         audio_url = None
         duration_sec = max(2.5, len(text) / 14.0)
         spoken_text = clean_text_for_tts(text)
@@ -528,7 +586,8 @@ class ClockRunner:
                 audio_dir = Path("cache/tts")
                 audio_dir.mkdir(parents=True, exist_ok=True)
                 ext = "mp3" if self.tts.provider_name in ("elevenlabs", "edge") else "wav"
-                filename = f"clock_{self._session_id}_t{self._total_turns}.{ext}"
+                self._tts_sequence += 1
+                filename = f"clock_{self._session_id}_t{self._tts_sequence}.{ext}"
                 (audio_dir / filename).write_bytes(audio_bytes)
                 audio_url = f"/audio/{filename}"
 
@@ -540,37 +599,43 @@ class ClockRunner:
                     # 16-bit 16kHz mono WAV is 32000 bytes/sec
                     duration_sec = max(2.0, len(audio_bytes) / 32000.0)
         except Exception as e:
-            logger.warning("TTS error in _speak_turn: %s", e)
+            logger.warning("TTS error in _synthesize_line: %s", e)
 
-        duration_sec = round(duration_sec, 2)
-        if audio_url:
-            await self._play_audio("turn", {
-                "slot_id": slot_id,
-                "slot_index": self._current_slot_idx,
-                "turn": self._total_turns,
-                "persona": speaker.id,
-                "persona_name": speaker.name,
-                "text": text,
-                "emotion": emotion,
-                "audio_url": audio_url,
-                "duration_sec": duration_sec,
-            })
+        return PreparedLine(speaker=speaker, text=text, emotion=emotion,
+                            audio_url=audio_url, duration_sec=round(duration_sec, 2))
+
+    async def _play_line(self, slot_id: str, line: PreparedLine, wait_spoken: bool = True) -> float:
+        """Put a rendered line on air and wait until the audio owner finished it."""
+        self._total_turns += 1
+        event = {
+            "slot_id": slot_id,
+            "slot_index": self._current_slot_idx,
+            "turn": self._total_turns,
+            "persona": line.speaker.id,
+            "persona_name": line.speaker.name,
+            "text": line.text,
+            "emotion": line.emotion,
+            "audio_url": line.audio_url,
+            "duration_sec": line.duration_sec,
+        }
+        if line.audio_url:
+            await self._play_audio("turn", event)
         else:
-            await self.emit_event("turn", {
-                "slot_id": slot_id,
-                "slot_index": self._current_slot_idx,
-                "turn": self._total_turns,
-                "persona": speaker.id,
-                "persona_name": speaker.name,
-                "text": text,
-                "emotion": emotion,
-                "audio_url": None,
-                "duration_sec": duration_sec,
-            })
+            await self.emit_event("turn", event)
             if wait_spoken:
-                await self._sleep_cancellable(duration_sec + 0.6)
+                await self._sleep_cancellable(line.duration_sec + 0.6)
+        return line.duration_sec
 
-        return duration_sec
+    async def _speak_turn(
+        self,
+        slot_id: str,
+        speaker: PersonaCard,
+        text: str,
+        emotion: str = "neutral",
+        wait_spoken: bool = True,
+    ) -> float:
+        line = await self._synthesize_line(speaker, text, emotion)
+        return await self._play_line(slot_id, line, wait_spoken=wait_spoken)
 
     async def _sleep_cancellable(self, seconds: float) -> None:
         step = 0.5

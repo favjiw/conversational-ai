@@ -85,6 +85,24 @@ class TestOutputRouting(unittest.TestCase):
                     break
             self.assertEqual(msg["data"], {"persona": "persona_a"})
 
+    def test_reconnecting_client_sees_running_clock_and_current_slot(self):
+        from app.schemas import SessionState
+        slot_event = {"type": "clock_slot_started", "data": {"slot_id": "s07", "slot_index": 6}}
+        runner = MagicMock(state=SessionState.RUNNING, last_slot_event=slot_event)
+        with patch.object(main, "clock_runner_instance", runner):
+            self.assertEqual(self.client.get("/health").json()["session_state"], "running")
+            with self.client.websocket_connect("/ws/session?role=console") as console:
+                status = console.receive_json()
+                self.assertEqual(status["type"], "status")
+                self.assertEqual(status["data"]["state"], "running")
+                self.assertEqual(console.receive_json(), slot_event)
+
+    def test_finished_clock_reports_idle(self):
+        from app.schemas import SessionState
+        runner = MagicMock(state=SessionState.FINISHED, last_slot_event=None)
+        with patch.object(main, "clock_runner_instance", runner):
+            self.assertEqual(self.client.get("/api/session/status").json()["state"], "idle")
+
     def test_owner_change_releases_pending_playback(self):
         runner = MagicMock()
         with patch.object(main, "clock_runner_instance", runner):

@@ -37,7 +37,7 @@ export class DebugPanel {
 
     // Lip-sync settings
     const lipsyncFolder = this.gui.addFolder('Lip-Sync');
-    lipsyncFolder.add(this.config.lipsync, 'gain', 0.5, 3.0, 0.1)
+    lipsyncFolder.add(this.config.lipsync, 'gain', 0.5, 8.0, 0.1)
       .name('Gain')
       .onChange(() => this.emit('lipsync', this.config.lipsync));
     lipsyncFolder.add(this.config.lipsync, 'gate', 0, 0.1, 0.001)
@@ -74,6 +74,9 @@ export class DebugPanel {
       .onChange(() => this.emit('expression_config', this.config.expression));
     exprFolder.add(this.config.expression, 'maxCombinedWeight', 0.5, 1.5, 0.05)
       .name('Batas Total Bobot')
+      .onChange(() => this.emit('expression_config', this.config.expression));
+    exprFolder.add(this.config.expression, 'speakingEmotionScale', 0, 1, 0.05)
+      .name('Emosi saat Bicara')
       .onChange(() => this.emit('expression_config', this.config.expression));
     exprFolder.open();
 

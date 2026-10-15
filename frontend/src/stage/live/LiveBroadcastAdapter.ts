@@ -52,6 +52,8 @@ export class LiveBroadcastAdapter {
   private idleManagers: Map<string, IdleManager>;
 
   private musicAudio: HTMLAudioElement | null = null;
+  // Pre-recorded station element (jingle, bumper, taping) currently on air.
+  private stationAudio: HTMLAudioElement | null = null;
   private isSkipping = false;
 
   // Turns play strictly one after another. Clock mode waits for feedback
@@ -72,6 +74,12 @@ export class LiveBroadcastAdapter {
   public onMusicChange?: (track: { title: string; artist: string; badge?: string } | null) => void;
   public onMusicProgress?: (percent: number) => void;
   public onCardModeChange?: (mode: 'talk' | 'song') => void;
+  /** The browser refused to play audio until the viewer interacts with the page. */
+  public onAutoplayBlocked?: () => void;
+
+  // Media the browser refused to autoplay. It is held (no "ended" feedback,
+  // so the rundown waits) and played on the next user interaction.
+  private blockedMedia: HTMLAudioElement | null = null;
 
   constructor(
     audioManager: AudioManager,
@@ -154,6 +162,7 @@ export class LiveBroadcastAdapter {
         this.isAudioOwner = Boolean(msg.data?.is_audio_owner);
         this.audioManager.setMuted(!this.isAudioOwner);
         if (this.musicAudio) this.musicAudio.muted = !this.isAudioOwner;
+        if (this.stationAudio) this.stationAudio.muted = !this.isAudioOwner;
         break;
       }
 
@@ -195,6 +204,14 @@ export class LiveBroadcastAdapter {
           return;
         }
         this.handleTurn(turnData);
+        break;
+      }
+
+      case 'clock_audio': {
+        if (msg.data?.generation !== undefined && msg.data.generation !== this.currentGeneration) {
+          return;
+        }
+        this.handleStationAudio(msg.data);
         break;
       }
 
@@ -285,6 +302,60 @@ export class LiveBroadcastAdapter {
     }
   }
 
+  /** Station recordings play as-is: announcers listen, no subtitle, no lip-sync. */
+  private handleStationAudio(data: { audio_url: string; session_id?: string; generation?: number; playback_id?: string }): void {
+    if (this.isSkipping) return;
+    this.onTurnChange?.(null);
+    this.onCardModeChange?.('talk');
+    this.setSpeaking(null);
+    for (const idle of this.idleManagers.values()) {
+      idle.isSpeaking = false;
+    }
+
+    this.stopStationAudio();
+    const audio = new Audio(data.audio_url);
+    audio.muted = !this.isAudioOwner;
+    this.stationAudio = audio;
+    const done = () => {
+      if (this.stationAudio !== audio) return;
+      this.stationAudio = null;
+      this.sendFeedback(data, 'ended');
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    audio.play().catch((err) => {
+      if (this.holdIfAutoplayBlocked(audio, err)) return;
+      console.warn('[LiveBroadcastAdapter] Station audio error:', err);
+      done();
+    });
+  }
+
+  /** Returns true when playback was blocked by autoplay policy and is now held. */
+  private holdIfAutoplayBlocked(audio: HTMLAudioElement, err: unknown): boolean {
+    if (!(err instanceof DOMException) || err.name !== 'NotAllowedError') return false;
+    console.warn('[LiveBroadcastAdapter] Autoplay blocked; waiting for a click to start audio');
+    this.blockedMedia = audio;
+    this.onAutoplayBlocked?.();
+    return true;
+  }
+
+  /** Call from a user gesture: plays media that autoplay policy held back. */
+  public resumeBlockedMedia(): void {
+    const audio = this.blockedMedia;
+    this.blockedMedia = null;
+    if (audio && (audio === this.stationAudio || audio === this.musicAudio)) {
+      audio.play().catch((err) => console.warn('[LiveBroadcastAdapter] Resume failed:', err));
+    }
+  }
+
+  private stopStationAudio(): void {
+    if (this.stationAudio) {
+      this.stationAudio.pause();
+      this.stationAudio.removeAttribute('src');
+      this.stationAudio = null;
+    }
+  }
+
   private handleMusic(data: LiveMusicData): void {
     if (this.isSkipping) return;
 
@@ -349,6 +420,7 @@ export class LiveBroadcastAdapter {
     };
 
     audio.play().catch((err) => {
+      if (this.holdIfAutoplayBlocked(audio, err)) return;
       console.warn('[LiveBroadcastAdapter] Music preview error:', err);
       this.musicAudio = null;
       this.sendFeedback(data, 'ended');
@@ -394,6 +466,8 @@ export class LiveBroadcastAdapter {
     }
     this.audioManager.stop();
     this.audioManager.clearQueue();
+    this.stopStationAudio();
+    this.blockedMedia = null;
 
     if (this.musicAudio) {
       this.musicAudio.pause();
