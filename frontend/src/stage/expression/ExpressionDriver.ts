@@ -21,7 +21,21 @@ export interface EmotionWeights {
 export interface ExpressionConfig {
   transitionMs: number; // 200 - 400 ms
   maxCombinedWeight: number; // 0.8 - 1.2, default 1.0
+  /**
+   * Fraction of the emotion kept while the character is talking (0 - 1).
+   * Emotion presets like "happy" carry their own open-mouth shape and, on
+   * VRM 1.0 models with overrideMouth, suppress the lip-sync visemes, so
+   * they are toned down while speaking and restored while listening.
+   */
+  speakingEmotionScale?: number;
 }
+
+const DEFAULT_SPEAKING_EMOTION_SCALE = 0.3;
+/** Mouth opening (0 - 1) that counts as "talking". */
+const SPEAKING_MOUTH_THRESHOLD = 0.06;
+/** How fast the talking envelope rises and falls (seconds). */
+const SPEAKING_ATTACK_SEC = 0.08;
+const SPEAKING_RELEASE_SEC = 0.6;
 
 /**
  * Target blendshape weights for the 7 standard emotions as defined in PRD FR-5.
@@ -43,6 +57,8 @@ export class ExpressionDriver {
 
   private currentEmotion: EmotionType = 'neutral';
   private targetEmotion: EmotionType = 'neutral';
+  /** 0 = listening, 1 = talking; smoothed so syllable gaps do not flicker. */
+  private speakingEnvelope = 0;
 
   // Current interpolated values
   private currentWeights: Map<string, number> = new Map([
@@ -175,9 +191,20 @@ export class ExpressionDriver {
       this.currentEmotion = this.targetEmotion;
     }
 
-    // Total mouth budget
+    // Talking envelope: rise fast on speech, fall slowly through pauses
+    const talking = mouthOpen > SPEAKING_MOUTH_THRESHOLD ? 1 : 0;
+    const envSec = talking > this.speakingEnvelope ? SPEAKING_ATTACK_SEC : SPEAKING_RELEASE_SEC;
+    this.speakingEnvelope += (talking - this.speakingEnvelope) * Math.min(1, deltaTime / envSec);
+
+    // Tone the emotion down while talking so the lip-sync visemes stay visible
+    const speakingScale = this.config.speakingEmotionScale ?? DEFAULT_SPEAKING_EMOTION_SCALE;
+    let emotionDamping = 1 - (1 - speakingScale) * this.speakingEnvelope;
+
+    // Keep emotion + mouth within the combined budget
     const mouthBudget = Math.max(0, this.config.maxCombinedWeight - mouthOpen);
-    const emotionDamping = mouthOpen > 0.05 ? Math.min(1.0, mouthBudget / 0.7) : 1.0;
+    if (maxWeight * emotionDamping > mouthBudget && maxWeight > 0) {
+      emotionDamping = mouthBudget / maxWeight;
+    }
 
     // Apply interpolated values to VRM expressions
     for (const [key, rawWeight] of this.currentWeights.entries()) {

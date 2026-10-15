@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 CATEGORY_QUERIES: dict[str, list[str]] = {
     "indo_hits": [
-        "top indonesia 2024",
         "hits indonesia terbaru",
         "juicy luicy",
         "mahalini",
@@ -128,6 +127,13 @@ class DeezerMusicProvider(MusicProvider):
         logger.info("Deezer search: category=%s query=%r", category, search_query)
 
         raw = await self._call_api(search_query, limit=limit + 5)
+        if not raw and not query:
+            # Some catalog queries come back empty; try another one for the category.
+            others = [q for q in CATEGORY_QUERIES.get(category, []) if q != search_query]
+            if others:
+                search_query = random.choice(others)
+                logger.info("Deezer empty result, retrying with %r", search_query)
+                raw = await self._call_api(search_query, limit=limit + 5)
         tracks: list[MusicTrack] = []
         for item in raw:
             preview = item.get("preview", "")

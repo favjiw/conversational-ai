@@ -41,7 +41,7 @@ from app.tts.provider import create_tts_provider
 from app.music.provider import create_music_provider
 from app.music.models import MusicTrack
 from app.clock.validator import validate_clock_semantics
-from app.orchestrator.clock_runner import clean_text_for_tts
+from app.orchestrator.clock_runner import clean_text_for_tts, resolve_station_audio
 
 # Logging configuration
 logging.basicConfig(
@@ -179,6 +179,17 @@ current_state: SessionState = SessionState.IDLE
 
 # ── Broadcast Helpers ───────────────────────────────────────────────────────
 
+def live_state() -> SessionState:
+    """State of whatever is on air: the clock rundown, else a plain session.
+
+    The clock runner keeps its own state, so ``current_state`` alone reports
+    "idle" while a rundown is on air (e.g. to a console that reloads).
+    """
+    if clock_runner_instance and clock_runner_instance.state in (SessionState.RUNNING, SessionState.PAUSED):
+        return clock_runner_instance.state
+    return current_state
+
+
 async def on_session_status(state: SessionState, session_id: Optional[str] = None):
     """Broadcast status change to all WebSocket clients."""
     global current_state
@@ -200,7 +211,7 @@ def health_check():
         "llm_mode": settings.LLM_MODE,
         "tts_mode": settings.TTS_MODE,
         "active_session": current_session_id,
-        "session_state": current_state.value,
+        "session_state": live_state().value,
     }
 
 @app.get("/audio/{filename}")
@@ -216,6 +227,15 @@ def serve_audio(filename: str):
 class TTSRequest(BaseModel):
     text: str
     voice: Optional[str] = "male_voice"
+
+
+@app.get("/station-audio/{filename}")
+def serve_station_audio(filename: str):
+    """Serve a station-owned recording (jingle, bumper, taping) for clock slots."""
+    path = resolve_station_audio(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Station audio not found")
+    return FileResponse(path, media_type="audio/mpeg" if path.suffix == ".mp3" else None)
 
 
 @app.post("/api/tts")
@@ -680,9 +700,10 @@ async def skip_clock_slot():
 
 @app.get("/api/session/status")
 def get_session_status():
+    state = live_state()
     return SessionStatus(
-        state=current_state,
-        current_slot_id="live" if current_state == SessionState.RUNNING else None,
+        state=state,
+        current_slot_id="live" if state == SessionState.RUNNING else None,
         elapsed_sec=0.0,
     )
 
@@ -713,8 +734,11 @@ async def websocket_session_endpoint(websocket: WebSocket, role: str = "console"
     try:
         await websocket.send_json({
             "type": "status",
-            "data": {"state": current_state.value, "session_id": current_session_id},
+            "data": {"state": live_state().value, "session_id": current_session_id},
         })
+        # A client joining mid-rundown also needs the slot that is on air.
+        if live_state() != SessionState.IDLE and clock_runner_instance and clock_runner_instance.last_slot_event:
+            await websocket.send_json(clock_runner_instance.last_slot_event)
         await _on_output_routing_changed(previous_owner)
         while True:
             data = await websocket.receive_text()

@@ -166,6 +166,22 @@ export function useLiveSession() {
             // No preview, auto-advance
             feedback(mTrack, 'ended');
           }
+        } else if (msg.type === 'clock_audio') {
+          // Pre-recorded station element (jingle, bumper, taping): no announcer speaks.
+          if (isAudioOwnerRef.current) {
+            audioQueueRef.current.push({
+              type: 'station',
+              slot_id: msg.data.slot_id,
+              audioUrl: msg.data.audio_url,
+              generation: msg.data.generation,
+              session_id: msg.data.session_id,
+              playback_id: msg.data.playback_id,
+            });
+            if (!isPlayingAudioRef.current) playNextInQueue();
+          } else {
+            setActiveSpeaker(null);
+            setPlaybackState('playing');
+          }
         } else if (msg.type === 'clock_cue') {
           setCueSlot(msg.data);
         }
@@ -312,6 +328,16 @@ export function useLiveSession() {
     };
   }, [sessionStatus.state]);
 
+  // A broadcast started elsewhere (another tab, before a reload) blocks a new
+  // start: offer to stop it instead of only reporting the error.
+  const offerStopIfAlreadyRunning = async (res, data) => {
+    if (res.status !== 400 || !/already running/i.test(data.detail || '')) return false;
+    if (window.confirm('Siaran sebelumnya masih berjalan. Hentikan siaran itu sekarang?')) {
+      await handleStop();
+    }
+    return true;
+  };
+
   const handleStart = async () => {
     // Unlock browser audio context for subsequent async playback
     try {
@@ -348,7 +374,9 @@ export function useLiveSession() {
           }),
         });
         const data = await res.json();
-        if (!res.ok) alert(`Gagal memulai Clock: ${data.detail || 'Terjadi kesalahan'}`);
+        if (!res.ok && !(await offerStopIfAlreadyRunning(res, data))) {
+          alert(`Gagal memulai Clock: ${data.detail || 'Terjadi kesalahan'}`);
+        }
       } else {
         const res = await fetch(`http://${window.location.hostname}:8000/api/session/start`, {
           method: 'POST',
@@ -364,7 +392,9 @@ export function useLiveSession() {
           }),
         });
         const data = await res.json();
-        if (!res.ok) alert(`Gagal memulai: ${data.detail || 'Terjadi kesalahan'}`);
+        if (!res.ok && !(await offerStopIfAlreadyRunning(res, data))) {
+          alert(`Gagal memulai: ${data.detail || 'Terjadi kesalahan'}`);
+        }
       }
     } catch (err) {
       alert(`Koneksi error: ${err.message}`);

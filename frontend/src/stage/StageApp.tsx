@@ -135,6 +135,8 @@ export function StageApp() {
 
         const audioManager = new AudioManager();
         audioManagerRef.current = audioManager;
+        // Debug only: lets devtools read live blendshape values while tuning.
+        if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current };
 
         audioManager.onSpeakingChange = (personaId) => {
           if (mounted) setActiveSpeaker((personaId as any) || null);
@@ -142,8 +144,8 @@ export function StageApp() {
 
         const debugConfig: DebugConfig = {
           quality: 'medium',
-          lipsync: { gain: 1.4, gate: 0.02, attackMs: 40, releaseMs: 120 },
-          expression: { transitionMs: 300, maxCombinedWeight: 1.0, personaAEmotion: 'neutral', personaBEmotion: 'neutral' },
+          lipsync: { gain: 4.5, gate: 0.02, attackMs: 40, releaseMs: 120 },
+          expression: { transitionMs: 300, maxCombinedWeight: 1.0, speakingEmotionScale: 0.3, personaAEmotion: 'neutral', personaBEmotion: 'neutral' },
           idle: { blinkMinSec: 2, blinkMaxSec: 6, headSway: 0.3, breath: 0.4 },
           showPanel: isDebug,
         };
@@ -308,6 +310,10 @@ export function StageApp() {
           if (mounted) setDisplayCardMode(mode);
         };
 
+        liveAdapter.onAutoplayBlocked = () => {
+          if (mounted) setAudioUnlocked(false);
+        };
+
         liveAdapter.connect();
 
         if (mounted) {
@@ -391,6 +397,8 @@ export function StageApp() {
   const activeScenario = scenariosData.get(selectedScenarioId);
 
   const handleUserInteraction = async () => {
+    // Inside the click: start anything autoplay policy held back.
+    liveAdapterRef.current?.resumeBlockedMedia();
     if (!audioUnlocked && audioManagerRef.current) {
       try {
         await audioManagerRef.current.initialize();
