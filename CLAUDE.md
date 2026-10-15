@@ -1,0 +1,4 @@
+Acuan desain sistem: @docs/KEPUTUSAN-DESAIN.md
+@docs/FORMAT-CLOCK-PAGI-BENER.md
+@docs/STRUKTUR-TEMA-HITS.md
+@docs/RUNDOWN-LIVE-1-JAM-DRAF.md
