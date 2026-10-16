@@ -127,6 +127,7 @@ class PreparedLine:
     emotion: str
     audio_url: Optional[str]
     duration_sec: float
+    word_timings: Optional[list[dict]] = None
 
 
 @dataclass
@@ -578,14 +579,18 @@ class ClockRunner:
     async def _synthesize_line(self, speaker: PersonaCard, text: str, emotion: str) -> PreparedLine:
         """Render TTS for a line without putting it on air."""
         audio_url = None
+        word_timings: Optional[list[dict]] = None
         duration_sec = max(2.5, len(text) / 14.0)
         spoken_text = clean_text_for_tts(text)
         try:
             if spoken_text:
-                audio_bytes = await self.tts.synthesize(spoken_text, speaker.voice or "male_voice")
+                audio_bytes, word_timings = await self.tts.synthesize_with_timings(
+                    spoken_text, speaker.voice or "male_voice",
+                )
                 audio_dir = Path("cache/tts")
                 audio_dir.mkdir(parents=True, exist_ok=True)
-                ext = "mp3" if self.tts.provider_name in ("elevenlabs", "edge") else "wav"
+                # provider_name may be wrapped, e.g. "cached_edge"
+                ext = "mp3" if any(p in self.tts.provider_name for p in ("elevenlabs", "edge")) else "wav"
                 self._tts_sequence += 1
                 filename = f"clock_{self._session_id}_t{self._tts_sequence}.{ext}"
                 (audio_dir / filename).write_bytes(audio_bytes)
@@ -602,7 +607,8 @@ class ClockRunner:
             logger.warning("TTS error in _synthesize_line: %s", e)
 
         return PreparedLine(speaker=speaker, text=text, emotion=emotion,
-                            audio_url=audio_url, duration_sec=round(duration_sec, 2))
+                            audio_url=audio_url, duration_sec=round(duration_sec, 2),
+                            word_timings=word_timings or None)
 
     async def _play_line(self, slot_id: str, line: PreparedLine, wait_spoken: bool = True) -> float:
         """Put a rendered line on air and wait until the audio owner finished it."""
@@ -617,6 +623,7 @@ class ClockRunner:
             "emotion": line.emotion,
             "audio_url": line.audio_url,
             "duration_sec": line.duration_sec,
+            "word_timings": line.word_timings,
         }
         if line.audio_url:
             await self._play_audio("turn", event)

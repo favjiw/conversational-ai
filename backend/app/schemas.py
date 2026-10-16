@@ -264,6 +264,8 @@ class TurnEvent(BaseModel):
     verdict: Optional[SupervisorVerdict] = None
     latency_ms: LatencyMs = Field(default_factory=LatencyMs)
     audio_url: Optional[str] = None
+    # Per-word timings from TTS (ms from audio start) for avatar lip-sync
+    word_timings: Optional[list[dict]] = None
 
 
 class StartSessionRequest(BaseModel):

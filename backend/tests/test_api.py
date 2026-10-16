@@ -73,5 +73,28 @@ class TestAPI(unittest.TestCase):
             self.assertTrue(response.content.startswith(b"RIFF"))
 
 
+class TestTTSLine(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_line_returns_playable_audio_and_timings(self):
+        from unittest.mock import AsyncMock
+        provider = MockTTSProvider()
+        provider.synthesize_with_timings = AsyncMock(return_value=(
+            b"ID3mp3", [{"offset_ms": 50.0, "duration_ms": 300.0, "text": "Halo"}],
+        ))
+        with patch("app.main.tts_provider", provider):
+            res = self.client.post("/api/tts/line", json={"text": "Halo / sobat", "persona": "persona_b"})
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["audio_url"].endswith(".mp3"))
+        self.assertEqual(data["word_timings"][0]["text"], "Halo")
+        self.assertEqual(self.client.get(data["audio_url"]).content, b"ID3mp3")
+
+    def test_empty_line_is_rejected(self):
+        res = self.client.post("/api/tts/line", json={"text": "  (tertawa) "})
+        self.assertEqual(res.status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()
