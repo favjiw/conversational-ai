@@ -249,6 +249,41 @@ async def synthesize_tts(req: TTSRequest):
         logger.error("TTS synthesize failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+class TTSLineRequest(BaseModel):
+    text: str
+    persona: str = "persona_a"
+
+
+def _presenter_voice(persona: str) -> str:
+    """Voice of a presenter for the configured TTS provider (persona_a male, persona_b female)."""
+    male = persona != "persona_b"
+    if settings.TTS_PROVIDER == "edge":
+        return settings.EDGE_VOICE_MALE if male else settings.EDGE_VOICE_FEMALE
+    if settings.TTS_PROVIDER == "elevenlabs":
+        return (settings.ELEVENLABS_VOICE_A if male else settings.ELEVENLABS_VOICE_B) or ("male" if male else "female")
+    return "Puck" if male else "Kore"
+
+
+@app.post("/api/tts/line")
+async def synthesize_line(req: TTSLineRequest):
+    """Speak one presenter line for the stage: audio URL plus per-word timings for lip-sync."""
+    spoken = clean_text_for_tts(req.text)
+    if not spoken:
+        raise HTTPException(status_code=400, detail="Text is empty after cleaning")
+    try:
+        audio_bytes, word_timings = await tts_provider.synthesize_with_timings(spoken, _presenter_voice(req.persona))
+    except Exception as e:
+        logger.error("TTS line failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    is_wav = audio_bytes.startswith(b"RIFF")
+    filename = f"line_{uuid.uuid4().hex[:12]}.{'wav' if is_wav else 'mp3'}"
+    cache_dir = Path("cache/tts")
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / filename).write_bytes(audio_bytes)
+    return {"audio_url": f"/audio/{filename}", "word_timings": word_timings, "text": req.text}
+
+
 @app.get("/api/music/search")
 async def search_music(category: str = "", query: str = "", limit: int = 5):
     """Search music tracks via the configured MusicProvider.
@@ -442,6 +477,7 @@ async def start_session(req: StartSessionRequest):
     async def on_turn_callback(turn_log: TurnLog):
         active_persona = persona_a if turn_log.persona == persona_a.id else persona_b
         audio_url = None
+        word_timings = None
         try:
             if settings.TTS_PROVIDER == "edge":
                 voice = settings.EDGE_VOICE_MALE if active_persona.gender == "male" else settings.EDGE_VOICE_FEMALE
@@ -456,10 +492,7 @@ async def start_session(req: StartSessionRequest):
             spoken_text = clean_text_for_tts(turn_log.final_text)
             if not spoken_text:
                 spoken_text = turn_log.final_text
-            audio_bytes = await tts_provider.synthesize(
-                text=spoken_text,
-                voice=voice,
-            )
+            audio_bytes, word_timings = await tts_provider.synthesize_with_timings(spoken_text, voice)
             cache_dir = Path("cache/tts")
             cache_dir.mkdir(parents=True, exist_ok=True)
             ext = "mp3" if settings.TTS_PROVIDER in ("elevenlabs", "edge") else "wav"
@@ -479,6 +512,7 @@ async def start_session(req: StartSessionRequest):
             text=turn_log.final_text,
             emotion=turn_log.emotion,
             audio_url=audio_url,
+            word_timings=word_timings or None,
         )
         await ws_manager.broadcast_json({
             "type": "turn",

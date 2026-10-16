@@ -1,11 +1,43 @@
 import * as THREE from 'three';
 import { VRM, VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { FaceDriver } from '../face/FaceDriver';
+import { StudioSet, type StudioSpot } from './StudioSet';
+import { applyGlbRestPose, ROCKETBOX_BONES, type GlbBoneMap } from '../face/GlbRig';
+
+/** Which model to load for a presenter (from avatar.config.json "characters"). */
+export interface CharacterSpec {
+  name: string;
+  /** "vrm" (anime VRM, expression manager) or "glb" (realistic, ARKit morph targets). */
+  kind: 'vrm' | 'glb';
+  url: string;
+  /** Uniform scale for GLB files authored in other units (e.g. 0.01 for centimetres). */
+  scale?: number;
+  /** Extra Y rotation (rad) for models that do not face +Z. */
+  rotationY?: number;
+  /** Name of the head bone/node, when auto-detection picks the wrong one. */
+  headBone?: string;
+  /** GLB rig bone names for the rest pose and idle (defaults: Rocketbox Biped). */
+  bones?: Partial<GlbBoneMap>;
+  /** How far below the head bone the camera aims (m); smaller = more headroom. */
+  framingDrop?: number;
+}
 
 export interface AvatarCharacter {
-  vrm: VRM;
+  kind: 'vrm' | 'glb';
+  /** Scene root of the model. */
+  root: THREE.Object3D;
+  /** Set for VRM characters only. */
+  vrm: VRM | null;
+  /** Set for GLB characters that carry ARKit blendshapes. */
+  face: FaceDriver | null;
+  /** Plays the model's idle clip, if the GLB has one. */
+  mixer: THREE.AnimationMixer | null;
+  /** Rig bone names (GLB only). */
+  bones: GlbBoneMap | null;
+  framingDrop: number;
   analyserNode: AnalyserNode | null;
-  position: THREE.Vector3;
   name: string;
   /** Head height in world units, measured once at load (rest pose). */
   headY: number;
@@ -19,7 +51,7 @@ const SPLIT_ORDER = ['persona_a', 'persona_b'] as const;
 const SPLIT_FRAMING = {
   fov: 30,
   /** Camera distance in front of the character (m). */
-  distance: 2.05,
+  distance: 2.3,
   /** How far below the head the camera aims, so the shot is chest-up (m). */
   targetDrop: 0.2,
   /** Distance between the two characters in the shared scene (m). */
@@ -28,10 +60,18 @@ const SPLIT_FRAMING = {
   inwardYaw: Math.PI / 12,
   fallbackHeadY: 1.35,
 };
-const SPLIT_BACKGROUND: Record<string, number> = {
-  persona_a: 0xeef3f1,
-  persona_b: 0xf5eff1,
+const STUDIO_BACKGROUND = 0x151821;
+const STUDIO_SIGNS: Record<string, StudioSpot['sign']> = {
+  persona_a: { text: 'ON AIR', color: '#ef4444', glow: '#f87171' },
+  persona_b: { text: '103.9 HITS', color: '#f59e0b', glow: '#fbbf24' },
 };
+const RIM_COLORS: Record<string, number> = {
+  persona_a: 0x2dd4bf,
+  persona_b: 0xf472b6,
+};
+
+/** Render layer of a presenter: each camera draws the studio (layer 0) plus its own presenter only. */
+const layerOf = (personaId: string) => SPLIT_ORDER.indexOf(personaId as (typeof SPLIT_ORDER)[number]) + 1;
 
 export class SceneManager {
   scene: THREE.Scene;
@@ -39,85 +79,96 @@ export class SceneManager {
   renderer: THREE.WebGLRenderer;
   clock: THREE.Clock;
   characters: Map<string, AvatarCharacter>;
-  
+  private studio: StudioSet | null = null;
+  private environment: THREE.Texture | null = null;
+  private keyLight!: THREE.DirectionalLight;
+
   constructor(container: HTMLElement) {
     this.scene = new THREE.Scene();
     this.cameras = new Map(
-      SPLIT_ORDER.map((id) => [id, new THREE.PerspectiveCamera(SPLIT_FRAMING.fov, 1, 0.1, 100)])
+      SPLIT_ORDER.map((id) => {
+        const camera = new THREE.PerspectiveCamera(SPLIT_FRAMING.fov, 1, 0.1, 100);
+        camera.layers.enable(layerOf(id));
+        return [id, camera];
+      })
     );
-    
-    this.renderer = new THREE.WebGLRenderer({ 
+
+    this.renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: true 
+      alpha: true
     });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    
+    // Filmic response keeps skin highlights from clipping on PBR characters
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
+
     container.appendChild(this.renderer.domElement);
-    
+
     this.clock = new THREE.Clock();
     this.characters = new Map();
-    
+
+    this.setupEnvironment();
     this.setupLights();
-    this.setupBackground();
+    this.scene.background = new THREE.Color(STUDIO_BACKGROUND);
     this.updateLayout(container);
-    
+
     this.onWindowResize = () => this.updateLayout(container);
     window.addEventListener('resize', this.onWindowResize);
   }
 
   private onWindowResize: () => void;
-  
+
+  /** Image-based lighting for PBR materials (skin, metal, fabric). */
+  private setupEnvironment() {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const room = new RoomEnvironment();
+    this.environment = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+    this.scene.environment = this.environment;
+    this.scene.environmentIntensity = 0.55;
+  }
+
   setupLights() {
-    // Key directional light (warm daylight)
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.4);
-    mainLight.position.set(1.5, 2.8, 2.2);
-    mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 1024;
-    mainLight.shadow.mapSize.height = 1024;
-    mainLight.shadow.camera.near = 0.5;
-    mainLight.shadow.camera.far = 10;
-    mainLight.shadow.bias = -0.0005;
-    this.scene.add(mainLight);
-    
-    // Fill light (soft cool white)
-    const fillLight = new THREE.DirectionalLight(0xf1f5f9, 0.7);
+    // Warm key light from the front, the only shadow caster
+    const keyLight = new THREE.DirectionalLight(0xfff1e0, 1.6);
+    keyLight.position.set(0.8, 2.8, 2.6);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 1024;
+    keyLight.shadow.mapSize.height = 1024;
+    keyLight.shadow.camera.near = 0.5;
+    keyLight.shadow.camera.far = 10;
+    keyLight.shadow.camera.left = -2.5;
+    keyLight.shadow.camera.right = 2.5;
+    keyLight.shadow.camera.top = 2.5;
+    keyLight.shadow.camera.bottom = -1;
+    keyLight.shadow.bias = -0.0005;
+    // Presenters live on their own layers; the shadow pass must still see them
+    keyLight.shadow.camera.layers.enableAll();
+    this.scene.add(keyLight);
+    this.keyLight = keyLight;
+
+    // Soft cool fill from the other side
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.5);
     fillLight.position.set(-2, 1.5, 1.8);
     this.scene.add(fillLight);
 
-    // Rim/Back light (crisp silhouette separation from light studio wall)
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
-    rimLight.position.set(0, 2.5, -2.2);
-    this.scene.add(rimLight);
-    
-    // Ambient light for overall soft illumination in light theme
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
-    this.scene.add(ambientLight);
-  }
-  
-  /** Shared background color, re-tinted per half while rendering. */
-  private background = new THREE.Color(SPLIT_BACKGROUND.persona_a);
-
-  setupBackground() {
-    this.scene.background = this.background;
-    
-    // Studio ground shadow plane
-    const groundGeometry = new THREE.PlaneGeometry(20, 20);
-    const groundMaterial = new THREE.ShadowMaterial({ opacity: 0.1 });
-    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
+    // Low ambient: the studio is darker than the old light background
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
   }
 
   /** Whether the frame is split left/right (landscape) or top/bottom (portrait). */
   private isPortrait(): boolean {
     const size = this.renderer.getSize(new THREE.Vector2());
     return size.x < size.y;
+  }
+
+  private presenterX(personaId: string): number {
+    return (layerOf(personaId) === 1 ? -1 : 1) * SPLIT_FRAMING.spacing / 2;
   }
 
   updateLayout(container?: HTMLElement) {
@@ -129,14 +180,14 @@ export class SceneManager {
     const portrait = width < height;
     const halfAspect = portrait ? width / (height / 2) : (width / 2) / height;
 
-    SPLIT_ORDER.forEach((personaId, i) => {
-      const x = (i === 0 ? -1 : 1) * SPLIT_FRAMING.spacing / 2;
+    SPLIT_ORDER.forEach((personaId) => {
+      const x = this.presenterX(personaId);
       const char = this.characters.get(personaId);
       const headY = char?.headY ?? SPLIT_FRAMING.fallbackHeadY;
-      if (char?.vrm) char.vrm.scene.position.x = x;
+      if (char) char.root.position.x = x;
 
       const camera = this.cameras.get(personaId)!;
-      const targetY = headY - SPLIT_FRAMING.targetDrop;
+      const targetY = headY - (char?.framingDrop ?? SPLIT_FRAMING.targetDrop);
       camera.fov = SPLIT_FRAMING.fov;
       camera.aspect = halfAspect;
       camera.position.set(x, targetY + 0.03, SPLIT_FRAMING.distance);
@@ -145,92 +196,166 @@ export class SceneManager {
     });
   }
 
-  async loadCharacter(
-    personaId: string, 
-    modelPath: string, 
-    position: THREE.Vector3,
-    name: string
-  ): Promise<void> {
+  /**
+   * Build the radio studio around the loaded presenters. Call once after
+   * loadCharacter() so desks and microphones match each head height.
+   */
+  buildStudio() {
+    this.studio?.dispose();
+    const spots: StudioSpot[] = SPLIT_ORDER.map((personaId) => ({
+      personaId,
+      x: this.presenterX(personaId),
+      headY: this.characters.get(personaId)?.headY ?? SPLIT_FRAMING.fallbackHeadY,
+      outerSide: layerOf(personaId) === 1 ? -1 : 1,
+      sign: STUDIO_SIGNS[personaId],
+    }));
+    this.studio = new StudioSet(spots);
+    for (const spot of spots) {
+      // Colored rim light behind each presenter for separation from the wall
+      const rim = new THREE.PointLight(RIM_COLORS[spot.personaId], 1.4, 2.0, 2);
+      rim.position.set(spot.x - spot.outerSide * 0.5, spot.headY + 0.35, -0.7);
+      this.studio.group.add(rim);
+    }
+    this.scene.add(this.studio.group);
+  }
+
+  async loadCharacter(personaId: string, spec: CharacterSpec): Promise<void> {
     const loader = new GLTFLoader();
-    loader.register((parser) => new VRMLoaderPlugin(parser));
-    
-    return new Promise((resolve, reject) => {
+    if (spec.kind === 'vrm') loader.register((parser) => new VRMLoaderPlugin(parser));
+
+    const gltf = await new Promise<any>((resolve, reject) => {
       loader.load(
-        modelPath,
-        (gltf) => {
-          const vrm = gltf.userData.vrm as VRM;
-          
-          if (!vrm) {
-            reject(new Error('No VRM data found in model'));
-            return;
-          }
-          
-          // Setup VRM
-          VRMUtils.removeUnnecessaryVertices(gltf.scene);
-          VRMUtils.removeUnnecessaryJoints(gltf.scene);
-          VRMUtils.rotateVRM0(vrm);
-          
-          vrm.scene.position.copy(position);
-          
-          // Turn characters slightly toward each other (across the split)
-          if (position.x < 0) {
-            vrm.scene.rotation.y += SPLIT_FRAMING.inwardYaw; // left character looks right
-          } else if (position.x > 0) {
-            vrm.scene.rotation.y -= SPLIT_FRAMING.inwardYaw; // right character looks left
-          }
-
-          // Measure head height once in rest pose to frame the camera
-          vrm.scene.updateMatrixWorld(true);
-          const headNode = vrm.humanoid?.getNormalizedBoneNode('head');
-          const headY = headNode
-            ? headNode.getWorldPosition(new THREE.Vector3()).y
-            : SPLIT_FRAMING.fallbackHeadY;
-          
-          // Enable shadows
-          vrm.scene.traverse((obj) => {
-            if ((obj as THREE.Mesh).isMesh) {
-              obj.castShadow = true;
-              obj.receiveShadow = true;
-            }
-          });
-          
-          this.scene.add(vrm.scene);
-          
-          this.characters.set(personaId, {
-            vrm,
-            analyserNode: null,
-            position,
-            name,
-            headY,
-          });
-          
-          this.updateLayout();
-
-          console.log(`✓ Loaded character: ${name} (${personaId})`);
-          resolve();
-        },
+        spec.url,
+        resolve,
         (progress) => {
-          console.log(`Loading ${name}: ${(progress.loaded / progress.total * 100).toFixed(0)}%`);
+          if (progress.total) console.log(`Loading ${spec.name}: ${(progress.loaded / progress.total * 100).toFixed(0)}%`);
         },
         (error) => {
-          console.error(`Failed to load ${name}:`, error);
+          console.error(`Failed to load ${spec.name}:`, error);
           reject(error);
         }
       );
     });
-  }
-  
-  update(deltaTime?: number) {
-    const dt = deltaTime !== undefined ? deltaTime : this.clock.getDelta();
-    
-    // Update each VRM
-    this.characters.forEach((character) => {
-      if (character.vrm) {
-        character.vrm.update(dt);
+
+    const character = spec.kind === 'vrm'
+      ? this.setupVrm(gltf, spec)
+      : this.setupGlb(gltf, spec);
+
+    const root = character.root;
+    root.position.set(this.presenterX(personaId), 0, 0);
+    // Turn characters slightly toward each other (across the split)
+    root.rotation.y += (root.position.x < 0 ? 1 : -1) * SPLIT_FRAMING.inwardYaw;
+    if (spec.framingDrop !== undefined) character.framingDrop = spec.framingDrop;
+
+    // GLB rigs come in a T/A-pose: put the arms down with hands on the desk
+    if (character.bones && !character.mixer && !applyGlbRestPose(root, character.bones)) {
+      console.warn(`[SceneManager] ${spec.name}: rest pose skipped, arm bones not found`);
+    }
+
+    root.traverse((obj) => {
+      obj.layers.set(layerOf(personaId));
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
       }
     });
+
+    this.scene.add(root);
+    this.characters.set(personaId, character);
+    this.updateLayout();
+
+    console.log(`✓ Loaded character: ${spec.name} (${personaId}, ${spec.kind})` +
+      (character.face ? ` – ${character.face.describe()}` : ''));
   }
-  
+
+  private setupVrm(gltf: any, spec: CharacterSpec): AvatarCharacter {
+    const vrm = gltf.userData.vrm as VRM | undefined;
+    if (!vrm) throw new Error(`No VRM data found in ${spec.url}`);
+
+    VRMUtils.removeUnnecessaryVertices(gltf.scene);
+    VRMUtils.removeUnnecessaryJoints(gltf.scene);
+    VRMUtils.rotateVRM0(vrm);
+    if (spec.rotationY) vrm.scene.rotation.y += spec.rotationY;
+
+    // Measure head height once in rest pose to frame the camera
+    vrm.scene.updateMatrixWorld(true);
+    const headNode = vrm.humanoid?.getNormalizedBoneNode('head');
+    const headY = headNode
+      ? headNode.getWorldPosition(new THREE.Vector3()).y
+      : SPLIT_FRAMING.fallbackHeadY;
+
+    return {
+      kind: 'vrm', root: vrm.scene, vrm, face: null, mixer: null, bones: null,
+      framingDrop: SPLIT_FRAMING.targetDrop, analyserNode: null, name: spec.name, headY,
+    };
+  }
+
+  private setupGlb(gltf: any, spec: CharacterSpec): AvatarCharacter {
+    const root: THREE.Object3D = gltf.scene;
+    if (spec.scale) root.scale.setScalar(spec.scale);
+    if (spec.rotationY) root.rotation.y += spec.rotationY;
+    root.updateMatrixWorld(true);
+
+    // Hair cards and eyelashes come as alpha-blended materials; cut them out
+    // instead, so they depth-sort correctly and render on both sides.
+    root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      for (const mat of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (mat.transparent) {
+          mat.transparent = false;
+          mat.alphaTest = 0.5;
+          mat.side = THREE.DoubleSide;
+        }
+      }
+    });
+
+    const face = new FaceDriver(root);
+    if (!face.hasArkit) {
+      console.warn(`[SceneManager] ${spec.name}: no ARKit blendshapes found; the face will not animate.`);
+    } else if (face.missing.length) {
+      console.warn(`[SceneManager] ${spec.name}: missing ARKit blendshapes: ${face.missing.join(', ')}`);
+    }
+
+    // Play an idle clip if the file has one, so the body is not frozen in bind pose
+    let mixer: THREE.AnimationMixer | null = null;
+    const clips: THREE.AnimationClip[] = gltf.animations ?? [];
+    const idle = clips.find((c) => /idle|breath/i.test(c.name)) ?? null;
+    if (idle) {
+      mixer = new THREE.AnimationMixer(root);
+      mixer.clipAction(idle).play();
+    }
+
+    return {
+      kind: 'glb', root, vrm: null, face: face.hasArkit ? face : null, mixer,
+      bones: { ...ROCKETBOX_BONES, ...spec.bones },
+      framingDrop: SPLIT_FRAMING.targetDrop, analyserNode: null, name: spec.name,
+      headY: this.findHeadY(root, spec),
+    };
+  }
+
+  /** Head height of a GLB: named bone, then any node ending in "head", then the model top. */
+  private findHeadY(root: THREE.Object3D, spec: CharacterSpec): number {
+    let head: THREE.Object3D | undefined;
+    if (spec.headBone) head = root.getObjectByName(spec.headBone);
+    if (!head) {
+      root.traverse((obj) => {
+        if (!head && /(^|[^a-z])head$/i.test(obj.name) && !/top|end/i.test(obj.name)) head = obj;
+      });
+    }
+    if (head) return head.getWorldPosition(new THREE.Vector3()).y;
+    const box = new THREE.Box3().setFromObject(root);
+    return Number.isFinite(box.max.y) ? box.max.y - 0.12 : SPLIT_FRAMING.fallbackHeadY;
+  }
+
+  update(deltaTime?: number) {
+    const dt = deltaTime !== undefined ? deltaTime : this.clock.getDelta();
+    this.characters.forEach((character) => {
+      character.vrm?.update(dt);
+      character.mixer?.update(dt);
+    });
+  }
+
   render() {
     const size = this.renderer.getSize(new THREE.Vector2());
     const portrait = this.isPortrait();
@@ -246,16 +371,15 @@ export class SceneManager {
       const h = portrait ? (i === 0 ? halfH : size.y - halfH) : size.y;
       this.renderer.setViewport(x, y, w, h);
       this.renderer.setScissor(x, y, w, h);
-      this.background.setHex(SPLIT_BACKGROUND[personaId]);
       this.renderer.render(this.scene, this.cameras.get(personaId)!);
     });
     this.renderer.setScissorTest(false);
   }
-  
+
   onResize(container: HTMLElement) {
     this.updateLayout(container);
   }
-  
+
   setQuality(quality: 'low' | 'medium' | 'high') {
     switch (quality) {
       case 'low':
@@ -271,14 +395,17 @@ export class SceneManager {
         this.renderer.shadowMap.enabled = true;
         break;
     }
+    this.keyLight.castShadow = this.renderer.shadowMap.enabled;
   }
-  
+
   dispose() {
     window.removeEventListener('resize', this.onWindowResize);
     this.renderer.domElement.remove();
+    this.studio?.dispose();
+    this.environment?.dispose();
     this.renderer.dispose();
     this.characters.forEach((character) => {
-      character.vrm.scene.traverse((obj) => {
+      character.root.traverse((obj) => {
         if ((obj as THREE.Mesh).isMesh) {
           const mesh = obj as THREE.Mesh;
           mesh.geometry.dispose();

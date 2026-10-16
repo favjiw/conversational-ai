@@ -25,7 +25,8 @@ export class LipSyncLevel1 {
   
 
   
-  update(vrm: VRM, audioLevel: number, deltaTimeMs: number) {
+  /** Pass vrm = null to only compute the mouth level (GLB characters read it via getMouthOpen). */
+  update(vrm: VRM | null, audioLevel: number, deltaTimeMs: number) {
     // Apply gain
     let level = audioLevel * this.config.gain;
     
@@ -48,7 +49,7 @@ export class LipSyncLevel1 {
     this.currentMouthOpen += (this.targetMouthOpen - this.currentMouthOpen) * alpha;
     
     // Apply to VRM blendshapes
-    this.applyToVRM(vrm);
+    if (vrm) this.applyToVRM(vrm);
   }
   
   private applyToVRM(vrm: VRM) {

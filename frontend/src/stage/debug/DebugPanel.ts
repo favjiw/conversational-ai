@@ -2,6 +2,9 @@ import { GUI } from 'lil-gui';
 import type { LipSyncConfig } from '../lipsync/LipSyncLevel1';
 import type { ExpressionConfig, EmotionType } from '../expression/ExpressionDriver';
 import type { IdleConfig } from '../idle/IdleManager';
+import type { FaceDriver } from '../face/FaceDriver';
+import type { VisemeLipSyncConfig } from '../lipsync/VisemeLipSync';
+import { ARKIT_BLENDSHAPES } from '../face/arkit';
 
 export interface DebugConfig {
   quality: 'low' | 'medium' | 'high';
@@ -11,6 +14,7 @@ export interface DebugConfig {
     personaBEmotion: EmotionType;
   };
   idle: IdleConfig;
+  viseme: VisemeLipSyncConfig;
   showPanel: boolean;
 }
 
@@ -50,6 +54,21 @@ export class DebugPanel {
       .name('Release (ms)')
       .onChange(() => this.emit('lipsync', this.config.lipsync));
     lipsyncFolder.close();
+
+    // Viseme lip-sync (realistic GLB characters)
+    const visemeFolder = this.gui.addFolder('Lip-Sync Viseme (GLB)');
+    visemeFolder.add(this.config.viseme, 'method', { 'Viseme (teks + timing TTS)': 'viseme', 'Amplitudo audio': 'amplitude' })
+      .name('Metode')
+      .onChange(() => this.emit('viseme', this.config.viseme));
+    visemeFolder.add(this.config.viseme, 'gain', 0, 1.5, 0.05).name('Kekuatan')
+      .onChange(() => this.emit('viseme', this.config.viseme));
+    visemeFolder.add(this.config.viseme, 'attackSec', 0.01, 0.2, 0.005).name('Attack (dtk)')
+      .onChange(() => this.emit('viseme', this.config.viseme));
+    visemeFolder.add(this.config.viseme, 'releaseSec', 0.01, 0.3, 0.005).name('Release (dtk)')
+      .onChange(() => this.emit('viseme', this.config.viseme));
+    visemeFolder.add(this.config.viseme, 'anticipation', 0, 1, 0.05).name('Koartikulasi')
+      .onChange(() => this.emit('viseme', this.config.viseme));
+    visemeFolder.close();
 
     // FR-5 Expression folder
     const emotions: EmotionType[] = [
@@ -101,6 +120,43 @@ export class DebugPanel {
     controlsFolder.add({ hidePanel: () => this.hide() }, 'hidePanel')
       .name('Sembunyikan Panel');
     controlsFolder.close();
+  }
+
+  /**
+   * Sliders for every ARKit blendshape of a GLB character. Missing names are
+   * listed but disabled. "Kontrol manual" pauses the automatic face animation
+   * so the sliders are not overwritten every frame.
+   */
+  addFaceSliders(label: string, face: FaceDriver) {
+    const folder = this.gui.addFolder(`ARKit ${label} (${face.available.length}/${ARKIT_BLENDSHAPES.length})`);
+    const state: Record<string, number | boolean> = { manual: face.manualOverride };
+    folder.add(state, 'manual')
+      .name('Kontrol manual')
+      .onChange((on: boolean) => {
+        face.manualOverride = on;
+        if (!on) face.reset();
+      });
+    folder.add({ reset: () => {
+      face.reset();
+      folder.controllersRecursive().forEach((c) => {
+        if (c.property !== 'manual' && typeof state[c.property] === 'number') {
+          state[c.property] = 0;
+          c.updateDisplay();
+        }
+      });
+    } }, 'reset').name('Reset semua ke 0');
+
+    for (const name of ARKIT_BLENDSHAPES) {
+      state[name] = face.get(name);
+      const ctrl = folder.add(state, name, 0, 1, 0.01).onChange((v: number) => {
+        face.manualOverride = true;
+        state.manual = true;
+        folder.controllersRecursive().find((c) => c.property === 'manual')?.updateDisplay();
+        face.set(name, v);
+      });
+      if (!face.available.includes(name)) ctrl.name(`${name} (tidak ada)`).disable();
+    }
+    folder.close();
   }
 
   setEmotionA(emotion: EmotionType) {

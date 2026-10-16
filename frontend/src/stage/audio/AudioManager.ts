@@ -15,6 +15,9 @@ export class AudioManager {
   private isPlaying = false;
   private onTurnEndCallback?: () => void;
   private currentPersona: string | null = null;
+  /** AudioContext time and length of the clip playing for the current persona. */
+  private playbackStart = 0;
+  private playbackDuration = 0;
   public onSpeakingChange?: (personaId: string | null) => void;
   
   constructor() {
@@ -131,6 +134,8 @@ export class AudioManager {
       
       this.currentSource = source;
       this.currentPersona = personaId;
+      this.playbackStart = this.audioContext.currentTime;
+      this.playbackDuration = audioBuffer.duration;
       this.isPlaying = true;
       this.onSpeakingChange?.(personaId);
       
@@ -206,6 +211,15 @@ export class AudioManager {
     return rms;
   }
   
+  /** Elapsed/duration (s) of the clip this persona is speaking, or null when silent. */
+  getPlayback(personaId: string): { elapsed: number; duration: number } | null {
+    if (!this.audioContext || this.currentPersona !== personaId || !this.currentSource) return null;
+    return {
+      elapsed: this.audioContext.currentTime - this.playbackStart,
+      duration: this.playbackDuration,
+    };
+  }
+
   getCurrentPersona(): string | null {
     return this.currentPersona;
   }

@@ -33,6 +33,9 @@ def _runner(broadcast=None) -> ClockRunner:
     llm.generate.return_value = SimpleNamespace(raw="Kalimat penyiar yang cukup panjang.")
     tts = MagicMock()
     tts.synthesize = AsyncMock(return_value=b"\x00" * 12000)
+    tts.synthesize_with_timings = AsyncMock(return_value=(
+        b"\x00" * 12000, [{"offset_ms": 100.0, "duration_ms": 250.0, "text": "Halo"}],
+    ))
     tts.provider_name = "mock"
     return ClockRunner(
         clock=_clock(),
@@ -62,7 +65,8 @@ class TestSongPrefetch(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(prepared.intro.audio_url)
         self.assertIsNotNone(prepared.outro.audio_url)
         self.assertNotEqual(prepared.intro.speaker.id, prepared.outro.speaker.id)
-        self.assertEqual(runner.tts.synthesize.await_count, 2)
+        self.assertEqual(runner.tts.synthesize_with_timings.await_count, 2)
+        self.assertEqual(prepared.intro.word_timings[0]["text"], "Halo")
 
     async def test_song_slot_uses_prepared_result_without_new_work(self):
         events = []
@@ -82,6 +86,7 @@ class TestSongPrefetch(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(runner.music.search.await_count, searches)
         self.assertEqual([e["type"] for e in events], ["turn", "clock_music", "turn"])
+        self.assertEqual(events[0]["data"]["word_timings"][0]["offset_ms"], 100.0)
         self.assertNotIn("s1", runner._song_prep)
 
     async def test_stop_cancels_preparation(self):
@@ -93,6 +98,47 @@ class TestSongPrefetch(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         self.assertTrue(task.cancelled() or task.done())
         self.assertEqual(runner._song_prep, {})
+
+
+class TestWordTimings(unittest.IsolatedAsyncioTestCase):
+    async def test_edge_collects_word_boundaries_in_ms(self):
+        class FakeCommunicate:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def stream(self):
+                yield {"type": "audio", "data": b"mp3"}
+                yield {"type": "WordBoundary", "offset": 1_000_000, "duration": 2_625_000, "text": "Halo"}
+
+        with patch("edge_tts.Communicate", FakeCommunicate):
+            audio, timings = await EdgeTTSProvider().synthesize_with_timings("Halo", "male")
+        self.assertEqual(audio, b"mp3")
+        self.assertEqual(timings, [{"offset_ms": 100.0, "duration_ms": 262.5, "text": "Halo"}])
+
+    async def test_cache_returns_stored_timings(self):
+        import tempfile
+        from app.tts.provider import AudioCache, CachedTTSProvider, TTSProvider
+
+        class Inner(TTSProvider):
+            calls = 0
+
+            async def synthesize(self, text, voice):
+                return b"x"
+
+            async def synthesize_with_timings(self, text, voice):
+                Inner.calls += 1
+                return b"x", [{"offset_ms": 0.0, "duration_ms": 10.0, "text": text}]
+
+            @property
+            def provider_name(self):
+                return "inner"
+
+        with tempfile.TemporaryDirectory() as d:
+            cached = CachedTTSProvider(Inner(), AudioCache(d))
+            first = await cached.synthesize_with_timings("hai", "v")
+            second = await cached.synthesize_with_timings("hai", "v")
+        self.assertEqual(first, second)
+        self.assertEqual(Inner.calls, 1)
 
 
 class TestElevenLabsBreaker(unittest.IsolatedAsyncioTestCase):

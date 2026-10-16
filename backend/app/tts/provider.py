@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import io
 import logging
 import struct
@@ -96,12 +97,37 @@ class AudioCache:
         logger.debug("Cached: %s (%d bytes)", key, len(audio))
         return path
 
+    def get_timings(self, text: str, voice: str, provider: str) -> Optional[list]:
+        """Word timings stored next to the audio, or None if never stored."""
+        path = self._cache_dir / f"{self._key(text, voice, provider)}.timings.json"
+        if path.exists():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except ValueError:
+                return None
+        return None
+
+    def put_timings(self, text: str, voice: str, provider: str, timings: list) -> None:
+        path = self._cache_dir / f"{self._key(text, voice, provider)}.timings.json"
+        path.write_text(json.dumps(timings), encoding="utf-8")
+
 
 # ── Provider interface ───────────────────────────────────────────────────────
 
 
+WordTiming = dict  # {"offset_ms": float, "duration_ms": float, "text": str}
+
+
 class TTSProvider(ABC):
     """Abstract TTS provider interface."""
+
+    async def synthesize_with_timings(self, text: str, voice: str) -> tuple[bytes, list[WordTiming]]:
+        """Synthesize audio plus per-word timings (ms from audio start) for lip-sync.
+
+        Providers without timing data return an empty list; the avatar then
+        estimates mouth shapes from the text and audio length.
+        """
+        return await self.synthesize(text, voice), []
 
     @abstractmethod
     async def synthesize(self, text: str, voice: str) -> bytes:
@@ -353,6 +379,10 @@ class EdgeTTSProvider(TTSProvider):
         self._elevenlabs_disabled = False
 
     async def synthesize(self, text: str, voice: str) -> bytes:
+        audio, _ = await self.synthesize_with_timings(text, voice)
+        return audio
+
+    async def synthesize_with_timings(self, text: str, voice: str) -> tuple[bytes, list[WordTiming]]:
         import edge_tts
 
         voice_id = (voice or "").strip()
@@ -363,7 +393,7 @@ class EdgeTTSProvider(TTSProvider):
                 and self._elevenlabs_key and not self._elevenlabs_disabled):
             try:
                 el_provider = ElevenLabsTTSProvider(api_key=self._elevenlabs_key, model_id=self._elevenlabs_model)
-                return await el_provider.synthesize(text, voice_id)
+                return await el_provider.synthesize(text, voice_id), []
             except Exception as e:
                 if any(f"({code})" in str(e) for code in (401, 402, 403)):
                     self._elevenlabs_disabled = True
@@ -392,15 +422,25 @@ class EdgeTTSProvider(TTSProvider):
         pitch = self._female_pitch if is_female else self._male_pitch
 
         cleaned_text = text.replace("//", "... ").replace("/", ", ")
-        communicate = edge_tts.Communicate(cleaned_text, voice_id, rate=rate, pitch=pitch)
+        communicate = edge_tts.Communicate(
+            cleaned_text, voice_id, rate=rate, pitch=pitch, boundary="WordBoundary",
+        )
         data = bytearray()
+        timings: list[WordTiming] = []
         async for chunk in communicate.stream():
             if chunk["type"] == "audio":
                 data.extend(chunk["data"])
+            elif chunk["type"] == "WordBoundary":
+                # offset/duration are in 100-nanosecond ticks
+                timings.append({
+                    "offset_ms": chunk["offset"] / 10_000,
+                    "duration_ms": chunk["duration"] / 10_000,
+                    "text": chunk["text"],
+                })
 
         if not data:
             raise RuntimeError(f"Edge TTS produced empty audio for voice {voice_id}")
-        return bytes(data)
+        return bytes(data), timings
 
     @property
     def provider_name(self) -> str:
@@ -485,6 +525,18 @@ class CachedTTSProvider(TTSProvider):
         audio = await self._inner.synthesize(text, voice)
         self._cache.put(text, voice, self._inner.provider_name, audio)
         return audio
+
+    async def synthesize_with_timings(self, text: str, voice: str) -> tuple[bytes, list[WordTiming]]:
+        name = self._inner.provider_name
+        cached = self._cache.get(text, voice, name)
+        timings = self._cache.get_timings(text, voice, name)
+        if cached is not None and timings is not None:
+            return cached, timings
+
+        audio, timings = await self._inner.synthesize_with_timings(text, voice)
+        self._cache.put(text, voice, name, audio)
+        self._cache.put_timings(text, voice, name, timings)
+        return audio, timings
 
     @property
     def provider_name(self) -> str:

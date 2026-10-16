@@ -1,5 +1,26 @@
 # Assets dan Lisensi
 
+## Model realistis GLB (aktif sejak 15 Okt 2026)
+
+### `public/models/realistic/raka.glb` (Raka / Persona A) dan `public/models/realistic/salsa.glb` (Salsa / Persona B)
+- **Model asli**: Microsoft Rocketbox `Male_Adult_06` (Raka) dan `Female_Adult_08` (Salsa), varian `*_facial.fbx`.
+- **Sumber**: https://github.com/microsoft/Microsoft-Rocketbox (`Assets/Avatars/Adults/...`)
+- **Lisensi**: MIT, Copyright (c) 2020 Microsoft. Teks lisensi disertakan di `public/models/realistic/LICENSE-Microsoft-Rocketbox.md`.
+- **Karakter original** buatan studio Rocketbox, bukan pindaian wajah orang sungguhan.
+- **Isi setelah konversi** (`frontend/scripts/convert_rocketbox.py`, Blender 5.2):
+  - 52 blendshape ARKit dengan nama standar (`jawOpen`, ...);
+  - 15 viseme Oculus (`viseme_sil` ... `viseme_U`);
+  - rig Biped 3ds Max (`Bip01_*`);
+  - sekitar 7.500 segitiga;
+  - tekstur 1024 px WebP (color, normal, opacity).
+
+  Shape key FACS/Headbox lain dibuang supaya file kecil.
+- **Cara membuat ulang**: unduh `*_facial.fbx` dan tekstur `*_body_color`, `*_body_normal`, `*_head_color`, `*_head_normal`, `*_opacity_color` (`.tga`), lalu jalankan:
+  `blender --background --factory-startup --python frontend/scripts/convert_rocketbox.py -- <fbx> <folder_tekstur> <m011|f008> <out.glb>`
+
+### `public/models/test/arkit-test-head.glb`
+- Model uji buatan sendiri (bola + silinder, 52 shape key ARKit) dari `frontend/scripts/make_arkit_test_head.py`. Tanpa lisensi pihak ketiga.
+
 ## Model VRM
 
 ### 1. `public/models/red-male.vrm` (Raka / Persona A - Aktif)
