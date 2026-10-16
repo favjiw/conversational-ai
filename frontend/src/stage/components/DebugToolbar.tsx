@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ScenarioTurn } from '../scenario/ScenarioPlayer';
 
 export interface DebugToolbarProps {
@@ -21,6 +21,8 @@ export interface DebugToolbarProps {
   turnIndex: number;
   onJumpTurn: (idx: number) => void;
   onTestSpeaker: (persona: 'persona_a' | 'persona_b') => void;
+  /** Speak free text through the backend TTS (with word timings for visemes). */
+  onSpeakText?: (persona: 'persona_a' | 'persona_b', text: string) => Promise<void>;
   displayCardMode: 'auto' | 'talk' | 'song';
   onToggleCardMode: () => void;
   showSafeZones: boolean;
@@ -50,6 +52,7 @@ export const DebugToolbar: React.FC<DebugToolbarProps> = ({
   turnIndex,
   onJumpTurn,
   onTestSpeaker,
+  onSpeakText,
   displayCardMode,
   onToggleCardMode,
   showSafeZones,
@@ -58,6 +61,19 @@ export const DebugToolbar: React.FC<DebugToolbarProps> = ({
   onToggleAspectRatio,
   onToggleDebugPanel,
 }) => {
+  const [lineText, setLineText] = useState('Halo sobat HITS, pagi ini kita ngobrolin ospek!');
+  const [linePersona, setLinePersona] = useState<'persona_a' | 'persona_b'>('persona_a');
+  const [lineBusy, setLineBusy] = useState(false);
+  const speak = async () => {
+    if (!onSpeakText || !lineText.trim() || lineBusy) return;
+    setLineBusy(true);
+    try {
+      await onSpeakText(linePersona, lineText.trim());
+    } finally {
+      setLineBusy(false);
+    }
+  };
+
   return (
     <aside className="debug-toolbar">
       <div className="debug-controls-row">
@@ -156,6 +172,29 @@ export const DebugToolbar: React.FC<DebugToolbarProps> = ({
           </>
         )}
       </div>
+
+      {onSpeakText && (
+        <div className="debug-controls-row">
+          <select
+            className="debug-select"
+            value={linePersona}
+            onChange={(e) => setLinePersona(e.target.value as 'persona_a' | 'persona_b')}
+          >
+            <option value="persona_a">Raka</option>
+            <option value="persona_b">Salsa</option>
+          </select>
+          <input
+            className="debug-select debug-text-input"
+            value={lineText}
+            onChange={(e) => setLineText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void speak(); }}
+            placeholder="Ketik kalimat untuk diucapkan..."
+          />
+          <button className="debug-btn debug-btn-primary" onClick={() => void speak()} disabled={lineBusy}>
+            {lineBusy ? 'Memproses...' : 'Ucapkan'}
+          </button>
+        </div>
+      )}
 
       <div className="debug-controls-row">
         <button

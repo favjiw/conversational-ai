@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 import Stats from 'stats.js';
-import { SceneManager } from './scene/SceneManager';
+import { SceneManager, type CharacterSpec } from './scene/SceneManager';
+import { GlbFaceAnimator } from './face/GlbFaceAnimator';
+import { GlbBodyIdle } from './face/GlbRig';
+import { VisemeLipSync, DEFAULT_VISEME_CONFIG, type VisemeLipSyncConfig } from './lipsync/VisemeLipSync';
 import { AudioManager } from './audio/AudioManager';
 import { LipSyncLevel1, type LipSyncConfig } from './lipsync/LipSyncLevel1';
 import { ExpressionDriver, type EmotionType, type ExpressionConfig } from './expression/ExpressionDriver';
@@ -18,6 +20,31 @@ const SCENARIOS = [
   { id: 'emosi-tajam-01', label: '2. Perubahan Emosi Tajam', path: '/scenarios/scenario_emotions.json' },
   { id: 'stabilitas-panjang-01', label: '3. Uji Stabilitas Panjang', path: '/scenarios/scenario_stability.json' },
 ];
+
+/** Presenter models used when avatar.config.json has no "characters" entry. */
+const DEFAULT_CHARACTERS: Record<'persona_a' | 'persona_b', CharacterSpec> = {
+  persona_a: { name: 'Raka', kind: 'vrm', url: '/models/red-male.vrm' },
+  persona_b: { name: 'Salsa', kind: 'vrm', url: '/models/female.vrm' },
+};
+
+interface AvatarConfigFile {
+  characters?: Partial<Record<'persona_a' | 'persona_b', CharacterSpec>>;
+  lipsync?: Partial<LipSyncConfig>;
+  expression?: Partial<ExpressionConfig>;
+  idle?: Partial<IdleConfig>;
+  glbFace?: { jawScale?: number };
+  viseme?: Partial<VisemeLipSyncConfig>;
+}
+
+/** avatar.config.json is optional: a missing or broken file falls back to defaults. */
+async function loadAvatarConfig(): Promise<AvatarConfigFile> {
+  try {
+    const res = await fetch('/avatar.config.json', { cache: 'no-store' });
+    return res.ok ? await res.json() : {};
+  } catch {
+    return {};
+  }
+}
 
 export interface MusicTrackData {
   title: string;
@@ -88,6 +115,10 @@ export function StageApp() {
   const lipSyncManagersRef = useRef<Map<string, LipSyncLevel1>>(new Map());
   const expressionDriversRef = useRef<Map<string, ExpressionDriver>>(new Map());
   const idleManagersRef = useRef<Map<string, IdleManager>>(new Map());
+  const glbFaceAnimatorsRef = useRef<Map<string, GlbFaceAnimator>>(new Map());
+  const glbBodyIdlesRef = useRef<Map<string, GlbBodyIdle>>(new Map());
+  const visemeLipSyncsRef = useRef<Map<string, VisemeLipSync>>(new Map());
+  const lipSyncMethodRef = useRef<VisemeLipSyncConfig['method']>('viseme');
   const scenarioPlayerRef = useRef<ScenarioPlayer | null>(null);
   const liveAdapterRef = useRef<LiveBroadcastAdapter | null>(null);
   const [scenariosData, setScenariosData] = useState<Map<string, ScenarioData>>(() => new Map());
@@ -138,17 +169,25 @@ export function StageApp() {
         // Debug only: lets devtools read live blendshape values while tuning.
         if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current };
 
+        const avatarConfig = await loadAvatarConfig();
+
         audioManager.onSpeakingChange = (personaId) => {
           if (mounted) setActiveSpeaker((personaId as any) || null);
         };
 
         const debugConfig: DebugConfig = {
           quality: 'medium',
-          lipsync: { gain: 4.5, gate: 0.02, attackMs: 40, releaseMs: 120 },
-          expression: { transitionMs: 300, maxCombinedWeight: 1.0, speakingEmotionScale: 0.3, personaAEmotion: 'neutral', personaBEmotion: 'neutral' },
-          idle: { blinkMinSec: 2, blinkMaxSec: 6, headSway: 0.3, breath: 0.4 },
+          lipsync: { gain: 4.5, gate: 0.02, attackMs: 40, releaseMs: 120, ...avatarConfig.lipsync },
+          expression: {
+            transitionMs: 300, maxCombinedWeight: 1.0, speakingEmotionScale: 0.3,
+            ...avatarConfig.expression,
+            personaAEmotion: 'neutral', personaBEmotion: 'neutral',
+          },
+          idle: { blinkMinSec: 2, blinkMaxSec: 6, headSway: 0.3, breath: 0.4, ...avatarConfig.idle },
+          viseme: { ...DEFAULT_VISEME_CONFIG, ...avatarConfig.viseme },
           showPanel: isDebug,
         };
+        lipSyncMethodRef.current = debugConfig.viseme.method;
 
         if (isDebug) {
           const debugPanel = new DebugPanel(debugConfig);
@@ -160,22 +199,40 @@ export function StageApp() {
           });
           debugPanel.on('emotion_a', (em: EmotionType) => {
             expressionDriversRef.current.get('persona_a')?.setEmotion(em);
+            glbFaceAnimatorsRef.current.get('persona_a')?.setEmotion(em);
           });
           debugPanel.on('emotion_b', (em: EmotionType) => {
             expressionDriversRef.current.get('persona_b')?.setEmotion(em);
+            glbFaceAnimatorsRef.current.get('persona_b')?.setEmotion(em);
           });
           debugPanel.on('expression_config', (cfg: ExpressionConfig) => {
             expressionDriversRef.current.forEach(ed => ed.setConfig(cfg));
+            glbFaceAnimatorsRef.current.forEach(fa => fa.setConfig({ speakingEmotionScale: cfg.speakingEmotionScale }));
+          });
+          debugPanel.on('viseme', (cfg: VisemeLipSyncConfig) => {
+            visemeLipSyncsRef.current.forEach(vl => vl.setConfig(cfg));
+            lipSyncMethodRef.current = cfg.method;
           });
           debugPanel.on('idle_config', (cfg: IdleConfig) => {
             idleManagersRef.current.forEach(im => im.setConfig(cfg));
+            glbFaceAnimatorsRef.current.forEach(fa => fa.setConfig(cfg));
+            glbBodyIdlesRef.current.forEach(bi => bi.setConfig(cfg));
           });
         }
 
-        await Promise.all([
-          sceneManager.loadCharacter('persona_a', '/models/red-male.vrm', new THREE.Vector3(-0.32, 0, 0), 'Raka'),
-          sceneManager.loadCharacter('persona_b', '/models/female.vrm', new THREE.Vector3(0.32, 0, 0), 'Salsa'),
-        ]);
+        // Debug only: ?avatarA=/models/x.glb&avatarB=... tries a model without editing the config
+        const params = new URLSearchParams(window.location.search);
+        const urlOverride = (personaId: 'persona_a' | 'persona_b'): Partial<CharacterSpec> => {
+          const url = isDebug ? params.get(personaId === 'persona_a' ? 'avatarA' : 'avatarB') : null;
+          return url ? { url, kind: url.toLowerCase().endsWith('.vrm') ? 'vrm' : 'glb' } : {};
+        };
+        await Promise.all((['persona_a', 'persona_b'] as const).map((personaId) =>
+          sceneManager.loadCharacter(personaId, {
+            ...DEFAULT_CHARACTERS[personaId],
+            ...avatarConfig.characters?.[personaId],
+            ...urlOverride(personaId),
+          })
+        ));
         // The driver maps are shared refs: a stale mount must not write into them.
         if (!mounted) {
           sceneManager.dispose();
@@ -183,13 +240,32 @@ export function StageApp() {
           return;
         }
 
+        sceneManager.buildStudio();
+
         ['persona_a', 'persona_b'].forEach(personaId => {
           const char = sceneManager.characters.get(personaId);
-          if (char?.vrm) {
-            char.analyserNode = audioManager.createAnalyser(personaId);
-            const ls = new LipSyncLevel1(debugConfig.lipsync);
-            lipSyncManagersRef.current.set(personaId, ls);
+          if (!char) return;
+          char.analyserNode = audioManager.createAnalyser(personaId);
+          lipSyncManagersRef.current.set(personaId, new LipSyncLevel1(debugConfig.lipsync));
 
+          if (char.bones && !char.mixer) {
+            glbBodyIdlesRef.current.set(personaId, new GlbBodyIdle(char.root, char.bones, debugConfig.idle));
+          }
+
+          if (char.face) {
+            // Realistic GLB: ARKit morph targets (interim jaw + blink until viseme lip-sync)
+            glbFaceAnimatorsRef.current.set(personaId, new GlbFaceAnimator(char.face, {
+              jawScale: avatarConfig.glbFace?.jawScale ?? 0.7,
+              blinkMinSec: debugConfig.idle.blinkMinSec,
+              blinkMaxSec: debugConfig.idle.blinkMaxSec,
+              speakingEmotionScale: debugConfig.expression.speakingEmotionScale,
+            // The partner sits on persona_a's left (+1) and on persona_b's right (-1)
+            }, personaId === 'persona_a' ? 1 : -1));
+            visemeLipSyncsRef.current.set(personaId, new VisemeLipSync(debugConfig.viseme));
+            debugPanelRef.current?.addFaceSliders(char.name, char.face);
+          }
+
+          if (char.vrm) {
             const ed = new ExpressionDriver(char.name, char.vrm, debugConfig.expression);
             expressionDriversRef.current.set(personaId, ed);
 
@@ -227,6 +303,9 @@ export function StageApp() {
         };
 
         player.onTurnChange = (turn, idx) => {
+          // Scenario clips carry no word timings: visemes are estimated from the text
+          visemeLipSyncsRef.current.get(turn.persona)?.setLine(turn.text, null);
+          glbFaceAnimatorsRef.current.get(turn.persona)?.setEmotion(turn.emotion);
           if (mounted) {
             setCurrentTurn(turn);
             setTurnIndex(idx);
@@ -310,6 +389,11 @@ export function StageApp() {
           if (mounted) setDisplayCardMode(mode);
         };
 
+        liveAdapter.onLineStart = (persona, text, wordTimings, emotion) => {
+          visemeLipSyncsRef.current.get(persona)?.setLine(text, wordTimings ?? null);
+          if (emotion) glbFaceAnimatorsRef.current.get(persona)?.setEmotion(emotion as EmotionType);
+        };
+
         liveAdapter.onAutoplayBlocked = () => {
           if (mounted) setAudioUnlocked(false);
         };
@@ -351,11 +435,28 @@ export function StageApp() {
         const im = idleManagersRef.current.get(personaId);
         const audioLevel = audioManager.getLevel(personaId);
 
+        if (ls) ls.update(char.vrm, audioLevel, deltaTimeMs);
+        const mouthOpen = ls ? ls.getMouthOpen() : 0;
         if (char.vrm) {
-          if (ls) ls.update(char.vrm, audioLevel, deltaTimeMs);
-          const mouthOpen = ls ? ls.getMouthOpen() : 0;
           if (ed) ed.update(deltaTime, mouthOpen);
           if (im) im.update(deltaTime);
+        }
+        const speaker = audioManager.getCurrentPersona();
+        const listening = speaker !== null && speaker !== personaId;
+        const faceAnimator = glbFaceAnimatorsRef.current.get(personaId);
+        if (faceAnimator) {
+          const vls = visemeLipSyncsRef.current.get(personaId);
+          const visemes = vls ? vls.update(deltaTime, audioManager.getPlayback(personaId), mouthOpen) : null;
+          const useVisemes = vls?.hasLine && lipSyncMethodRef.current === 'viseme';
+          faceAnimator.isListening = listening;
+          // Without a line (e.g. a bare test clip) fall back to amplitude jaw motion
+          faceAnimator.update(deltaTime, mouthOpen, useVisemes ? visemes : null);
+        }
+        const bodyIdle = glbBodyIdlesRef.current.get(personaId);
+        if (bodyIdle) {
+          bodyIdle.isSpeaking = speaker === personaId;
+          bodyIdle.isListening = listening;
+          bodyIdle.update(deltaTime);
         }
       });
 
@@ -451,6 +552,27 @@ export function StageApp() {
     const idle = idleManagersRef.current.get(persona);
     if (idle) idle.isSpeaking = true;
     setActiveSpeaker(persona);
+  };
+
+  /** Debug: speak free text through the backend TTS, with word timings driving the visemes. */
+  const handleSpeakText = async (persona: 'persona_a' | 'persona_b', text: string) => {
+    await handleUserInteraction();
+    try {
+      const res = await fetch('/api/tts/line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, persona }),
+      });
+      if (!res.ok) throw new Error(`TTS ${res.status}: ${await res.text()}`);
+      const line = await res.json();
+      visemeLipSyncsRef.current.get(persona)?.setLine(line.text, line.word_timings ?? null);
+      setCurrentTurn({ persona, text: line.text, emotion: 'neutral' });
+      audioManagerRef.current?.clearQueue();
+      await audioManagerRef.current?.playAudio(persona, line.audio_url);
+    } catch (err: any) {
+      console.error('Speak text failed:', err);
+      alert(`Gagal mengucapkan teks: ${err.message}`);
+    }
   };
 
   const handleToggleAspectRatio = () => {
@@ -550,6 +672,7 @@ export function StageApp() {
           turnIndex={turnIndex}
           onJumpTurn={(idx) => scenarioPlayerRef.current?.jumpToTurn(idx)}
           onTestSpeaker={handleTestSpeaker}
+          onSpeakText={handleSpeakText}
           displayCardMode={displayCardMode}
           onToggleCardMode={() => setDisplayCardMode(prev => (prev === 'song' ? 'talk' : 'song'))}
           showSafeZones={showSafeZones}

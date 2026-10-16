@@ -13,6 +13,8 @@ export interface LiveTurnData {
   generation?: number;
   session_id?: string;
   playback_id?: string;
+  /** Per-word TTS timings (ms from audio start) for viseme lip-sync. */
+  word_timings?: { offset_ms: number; duration_ms: number; text: string }[] | null;
 }
 
 export interface LiveMusicData {
@@ -74,6 +76,8 @@ export class LiveBroadcastAdapter {
   public onMusicChange?: (track: { title: string; artist: string; badge?: string } | null) => void;
   public onMusicProgress?: (percent: number) => void;
   public onCardModeChange?: (mode: 'talk' | 'song') => void;
+  /** A presenter is about to speak a line (text + optional word timings for lip-sync). */
+  public onLineStart?: (persona: 'persona_a' | 'persona_b', text: string, wordTimings: LiveTurnData['word_timings'], emotion?: string) => void;
   /** The browser refused to play audio until the viewer interacts with the page. */
   public onAutoplayBlocked?: () => void;
 
@@ -278,6 +282,7 @@ export class LiveBroadcastAdapter {
     if (otherIdle) otherIdle.isSpeaking = false;
 
     this.setSpeaking(personaKey);
+    this.onLineStart?.(personaKey, data.text, data.word_timings ?? null, data.emotion);
 
     const finish = () => {
       if (idle) idle.isSpeaking = false;

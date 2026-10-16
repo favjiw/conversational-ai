@@ -564,6 +564,11 @@
   text-overflow: ellipsis;
 }
 
+.stage-app .debug-text-input {
+  flex: 1;
+  min-width: 260px;
+}
+
 /* lil-gui Light Theme Customization */
 .lil-gui {
   --background-color: #ffffff !important;
