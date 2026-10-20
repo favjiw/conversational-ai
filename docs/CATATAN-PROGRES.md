@@ -8,18 +8,13 @@ Terakhir diperbarui: 20 Okt 2026.
 
 ## 1. Status singkat
 
-- **Branch aktif: `talk-durasi`**, dibuat dari `song-recommender` (PR #6). Isinya Talk panjang berbasis durasi, komentar dibacakan, dan gaya HITS (§12).
-- **PR #6 (`song-recommender`)** menunggu review/merge: rekomendasi lagu (§11), voice Indonesia, joget saat lagu.
-- **PR #5 (`stage-portrait`)** menunggu review/merge:
-  - Tahap 1 (layout 9:16)
-  - dua gaya karakter
-  - TTS ElevenLabs
-  - Tahap 2 (HUD 9:16)
-  - skrip rekam demo
+- **Branch aktif: `talk-durasi`** (PR #7 ke `main`). Isinya Talk panjang berbasis durasi, komentar dibacakan, dan gaya HITS (§12).
 - **Sudah di-merge ke `main`:**
   - PR #1/#2: peran WebSocket console vs stage
   - PR #3: rekaman stasiun, persiapan lagu di belakang layar, rundown 1 jam
   - PR #4: avatar realistis dan lip-sync viseme
+  - PR #5: stage 9:16, dua gaya karakter, TTS ElevenLabs
+  - PR #6: rekomendasi lagu dari komentar (§11), voice Indonesia, joget saat lagu
 - **Tes:** backend 149 tes lulus (`cd backend && python -m unittest discover -s tests`). `test_compute_factor_drift_stable` kadang gagal karena `np.random` tanpa seed (bawaan, tidak terkait). Frontend: type check, `vite build`, dan `oxlint src/stage` bersih.
 - **Demo untuk pembimbing** sudah direkam di `demo-recordings/` (di-gitignore):
   - `demo-3d-realistic.mp4` (5 menit)
