@@ -1,4 +1,4 @@
-"""Tests for the 1-hour rundown (docs/RUNDOWN-LIVE-1-JAM-DRAF.md) and its Tema library."""
+"""Tests for the 1-hour rundown (docs/RUNDOWN-LIVE-1-JAM-DRAF.md, draf v2.1) and its Tema library."""
 
 import asyncio
 import unittest
@@ -16,14 +16,25 @@ class TestRundownDraft(unittest.TestCase):
     def test_talk_order_follows_draft(self):
         talks = [s.label for s in self.clock.slots if s.source == SlotSource.LLM_CONVERSATION]
         self.assertEqual(talks, [
-            "Ice Breaking", "Talk 1 - Opening", "Talk 2 - Say Hi!", "Talk 3 - Teaser 3M",
+            "Ice Breaking", "Talk 1 - Opening", "Talk 2 - Say Hi!", "Talk 3 - Say Hi! lanjutan + Teaser 3M",
             "Talk 4 - 3M", "Talk 5 - Konten / SKEMA", "Closing",
         ])
 
     def test_quarters_and_song_count(self):
         markers = [s.target_min for s in self.clock.slots if s.type == SlotType.TIME_MARKER]
         self.assertEqual(markers, [15, 30, 45])
-        self.assertEqual(sum(s.type == SlotType.SONG for s in self.clock.slots), 11)
+        self.assertEqual(sum(s.type == SlotType.SONG for s in self.clock.slots), 5)
+
+    def test_v21_no_back_to_back_songs_and_one_spot_per_quarter(self):
+        slots = [s for s in self.clock.slots if s.type != SlotType.TIME_MARKER]
+        for a, b in zip(slots, slots[1:]):
+            self.assertFalse(a.type == SlotType.SONG and b.type == SlotType.SONG, (a.id, b.id))
+        self.assertEqual(sum(s.type == SlotType.SPOT_ADLIBS for s in self.clock.slots), 3)
+
+    def test_v21_talk_minutes(self):
+        talk = sum(s.duration_sec for s in self.clock.slots
+                   if s.type == SlotType.TALK or s.source == SlotSource.LLM_CONVERSATION)
+        self.assertGreaterEqual(talk, 35 * 60)
 
     def test_news_and_traffic_not_in_rundown(self):
         labels = " ".join(s.label or "" for s in self.clock.slots)
