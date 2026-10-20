@@ -1,25 +1,40 @@
 {
-  "characters": {
-    "persona_a": {
-      "name": "Raka",
-      "kind": "glb",
-      "url": "/models/realistic/raka.glb"
-    },
-    "persona_b": {
-      "name": "Salsa",
-      "kind": "glb",
-      "url": "/models/realistic/salsa.glb"
-    },
-    "_vrm_fallback": {
-      "persona_a": {
-        "name": "Raka",
-        "kind": "vrm",
-        "url": "/models/red-male.vrm"
+  "defaultStyle": "realistic",
+  "styles": {
+    "realistic": {
+      "label": "3D Realistis",
+      "characters": {
+        "persona_a": {
+          "name": "Raka",
+          "kind": "glb",
+          "url": "/models/realistic/raka.glb"
+        },
+        "persona_b": {
+          "name": "Salsa",
+          "kind": "glb",
+          "url": "/models/realistic/salsa.glb"
+        }
       },
-      "persona_b": {
-        "name": "Salsa",
-        "kind": "vrm",
-        "url": "/models/female.vrm"
+      "render": {
+        "toneMapping": "aces"
+      }
+    },
+    "animation": {
+      "label": "Animasi (VTuber)",
+      "characters": {
+        "persona_a": {
+          "name": "Raka",
+          "kind": "vrm",
+          "url": "/models/red-male.vrm"
+        },
+        "persona_b": {
+          "name": "Salsa",
+          "kind": "vrm",
+          "url": "/models/female.vrm"
+        }
+      },
+      "render": {
+        "toneMapping": "none"
       }
     }
   },
@@ -51,5 +66,10 @@
     "attackSec": 0.045,
     "releaseSec": 0.07,
     "anticipation": 0.35
+  },
+  "program": {
+    "title": "PAGI BENER",
+    "station": "103.9 HITS",
+    "pinnedQuestion": "SIAPA YANG LAGI OSPEK? CERITAIN DI KOMENTAR, SOBAT HITS!"
   }
 }

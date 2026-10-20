@@ -7,6 +7,8 @@ export interface ScenarioTurn {
   text: string;
   emotion: EmotionType;
   audio?: string;
+  /** Optional pinned bait question shown on stage from this turn on. */
+  pinned?: string;
 }
 
 export interface ScenarioData {

@@ -279,6 +279,31 @@ class GeminiTTSProvider(TTSProvider):
 # ── ElevenLabs TTS provider ──────────────────────────────────────────────────
 
 
+def alignment_to_word_timings(alignment: Optional[dict]) -> list[WordTiming]:
+    """Group ElevenLabs per-character alignment into per-word timings (ms)."""
+    if not alignment:
+        return []
+    chars = alignment.get("characters") or []
+    starts = alignment.get("character_start_times_seconds") or []
+    ends = alignment.get("character_end_times_seconds") or []
+    words: list[WordTiming] = []
+    current = ""
+    start = end = 0.0
+    for ch, s0, s1 in zip(chars, starts, ends):
+        if ch.isspace():
+            if current:
+                words.append({"offset_ms": start * 1000, "duration_ms": (end - start) * 1000, "text": current})
+                current = ""
+            continue
+        if not current:
+            start = s0
+        current += ch
+        end = s1
+    if current:
+        words.append({"offset_ms": start * 1000, "duration_ms": (end - start) * 1000, "text": current})
+    return words
+
+
 class ElevenLabsTTSProvider(TTSProvider):
     """ElevenLabs TTS provider using REST API with httpx."""
 
@@ -296,6 +321,13 @@ class ElevenLabsTTSProvider(TTSProvider):
         self._default_voice = default_voice
 
     async def synthesize(self, text: str, voice: str) -> bytes:
+        audio, _ = await self.synthesize_with_timings(text, voice)
+        return audio
+
+    async def synthesize_with_timings(self, text: str, voice: str) -> tuple[bytes, list[WordTiming]]:
+        """Audio plus word timings, from ElevenLabs' character alignment (/with-timestamps)."""
+        import base64
+
         import httpx
 
         # Map generic voice names or use the provided voice ID
@@ -308,11 +340,11 @@ class ElevenLabsTTSProvider(TTSProvider):
         # Strip pause markers or replace them with ellipses/commas for natural pause in ElevenLabs
         cleaned_text = text.replace("//", "... ").replace("/", ", ")
 
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/with-timestamps"
         headers = {
             "xi-api-key": self._api_key,
             "Content-Type": "application/json",
-            "Accept": "audio/mpeg",
+            "Accept": "application/json",
         }
         payload = {
             "text": cleaned_text,
@@ -332,14 +364,17 @@ class ElevenLabsTTSProvider(TTSProvider):
                     voice_id,
                     self.DEFAULT_VOICE_MALE,
                 )
-                fallback_url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.DEFAULT_VOICE_MALE}"
+                fallback_url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.DEFAULT_VOICE_MALE}/with-timestamps"
                 resp = await client.post(fallback_url, headers=headers, json=payload)
 
             if resp.status_code != 200:
                 raise RuntimeError(
                     f"ElevenLabs TTS failed ({resp.status_code}): {resp.text}"
                 )
-            return resp.content
+            data = resp.json()
+
+        audio = base64.b64decode(data["audio_base64"])
+        return audio, alignment_to_word_timings(data.get("alignment") or data.get("normalized_alignment"))
 
     @property
     def provider_name(self) -> str:
@@ -393,7 +428,7 @@ class EdgeTTSProvider(TTSProvider):
                 and self._elevenlabs_key and not self._elevenlabs_disabled):
             try:
                 el_provider = ElevenLabsTTSProvider(api_key=self._elevenlabs_key, model_id=self._elevenlabs_model)
-                return await el_provider.synthesize(text, voice_id), []
+                return await el_provider.synthesize_with_timings(text, voice_id)
             except Exception as e:
                 if any(f"({code})" in str(e) for code in (401, 402, 403)):
                     self._elevenlabs_disabled = True

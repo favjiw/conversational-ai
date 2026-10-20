@@ -76,6 +76,8 @@ export class LiveBroadcastAdapter {
   public onMusicChange?: (track: { title: string; artist: string; badge?: string } | null) => void;
   public onMusicProgress?: (percent: number) => void;
   public onCardModeChange?: (mode: 'talk' | 'song') => void;
+  /** Topic of the current session theme (session mode "theme_change"). */
+  public onTopicChange?: (topic: string | null) => void;
   /** A presenter is about to speak a line (text + optional word timings for lip-sync). */
   public onLineStart?: (persona: 'persona_a' | 'persona_b', text: string, wordTimings: LiveTurnData['word_timings'], emotion?: string) => void;
   /** The browser refused to play audio until the viewer interacts with the page. */
@@ -167,6 +169,11 @@ export class LiveBroadcastAdapter {
         this.audioManager.setMuted(!this.isAudioOwner);
         if (this.musicAudio) this.musicAudio.muted = !this.isAudioOwner;
         if (this.stationAudio) this.stationAudio.muted = !this.isAudioOwner;
+        break;
+      }
+
+      case 'theme_change': {
+        this.onTopicChange?.(msg.data?.title ?? null);
         break;
       }
 

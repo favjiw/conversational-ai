@@ -85,3 +85,6 @@ pnpm-debug.log*
 Thumbs.db
 desktop.ini
 
+
+# Demo videos (large, not source)
+demo-recordings/
