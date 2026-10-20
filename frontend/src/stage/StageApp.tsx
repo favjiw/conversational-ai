@@ -98,6 +98,7 @@ export interface MusicTrackData {
   title: string;
   artist: string;
   badge?: string;
+  requestedBy?: string;
 }
 
 const DEFAULT_DEMO_TRACK: MusicTrackData = {
@@ -230,7 +231,7 @@ export function StageApp() {
         const audioManager = new AudioManager();
         audioManagerRef.current = audioManager;
         // Debug only: lets devtools read live blendshape values while tuning.
-        if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current };
+        if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current, idleManagers: idleManagersRef.current };
 
         audioManager.onSpeakingChange = (personaId) => {
           if (mounted) setActiveSpeaker((personaId as any) || null);
@@ -574,7 +575,7 @@ export function StageApp() {
   // Right-column card: song while music plays, the talk topic, or the cue on air
   const slotType = currentSlot?.slot_type;
   const infoCard: InfoCard = isSongMode && activeMusicTrack
-    ? { kind: 'song', title: activeMusicTrack.title, artist: activeMusicTrack.artist, badge: activeMusicTrack.badge, progress: songProgress }
+    ? { kind: 'song', title: activeMusicTrack.title, artist: activeMusicTrack.artist, badge: activeMusicTrack.badge, requestedBy: activeMusicTrack.requestedBy, progress: songProgress }
     : slotType === 'song'
       // Song slot before the music starts: the presenters are introducing it
       ? { kind: 'talk', label: currentSlot?.label || 'Lagu', badge: 'LAGU BERIKUTNYA' }
@@ -583,6 +584,12 @@ export function StageApp() {
       : currentSlot?.label || topic
         ? { kind: 'talk', label: currentSlot?.label || 'Talk', topic: topic ?? undefined }
         : null;
+
+  // Debug: "Kartu: Lagu" also previews the music groove (live mode follows the song audio).
+  useEffect(() => {
+    if (!isDebug) return;
+    idleManagersRef.current.forEach(im => im.setMusicPlaying(displayCardMode === 'song'));
+  }, [isDebug, displayCardMode]);
 
   // Face markers for the safe-zone overlay (cheap: two projections, 4x per second)
   useEffect(() => {

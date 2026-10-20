@@ -16,7 +16,7 @@ export interface PanelSpeaker {
 /** What the right column of the bottom panel shows. */
 export type InfoCard =
   | { kind: 'talk'; label: string; topic?: string; badge?: string }
-  | { kind: 'song'; title: string; artist: string; badge?: string; progress: number }
+  | { kind: 'song'; title: string; artist: string; badge?: string; requestedBy?: string; progress: number }
   | { kind: 'cue'; label: string }
   | null;
 
@@ -73,6 +73,7 @@ export const PortraitHUD: React.FC<PortraitHUDProps> = ({ program, currentTime, 
             <span className="ph-info-badge">{info.badge || 'NOW PLAYING'}</span>
             <span className="ph-info-title">{info.title}</span>
             <span className="ph-info-sub">{info.artist}</span>
+            {info.requestedBy && <span className="ph-info-request">Request @{info.requestedBy}</span>}
             <div className="ph-progress"><div style={{ width: `${info.progress}%` }} /></div>
           </>
         )}

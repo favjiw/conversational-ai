@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     PERSONA_PRESENCE_PENALTY: float = 0.0  # 0 = not sent
     PERSONA_FREQUENCY_PENALTY: float = 0.0  # 0 = not sent
 
+    # --- Rekomendasi lagu (modul hits_rec, repo ffromme/hits-song-recommender) ---
+    # LLM rekomendasi terpisah dari Gemini persona (API OpenAI-compatible, default Groq).
+    RECOMMENDER_ENABLED: bool = False
+    RECOMMENDER_LLM_API_KEY: str = ""
+    RECOMMENDER_LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
+    RECOMMENDER_LLM_MODEL: str = "qwen/qwen3.8-27b"
+    RECOMMENDER_LLM_REASONING_EFFORT: str = ""  # kosong = default model
+    RECOMMENDER_TIMEOUT_SEC: float = 8.0  # batas waktu satu rekomendasi sebelum fallback
+    RECOMMENDER_MAX_PENDING: int = 5  # maks request lagu penonton yang menunggu
+    RECOMMENDER_TALK_MOOD: bool = False  # lagu dari mood topik Talk (KEPUTUSAN-DESAIN §9 belum diputuskan)
+    RECOMMENDER_LLM_CACHE: bool = False  # cache jawaban LLM hits_rec; mati = latensi di log nyata
+
     # --- Testing ---
     FAIL_INJECT: str = ""  # llm | tts | music
 

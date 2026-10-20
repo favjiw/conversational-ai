@@ -40,6 +40,9 @@ from app.session_logging.logger import SessionLogger
 from app.tts.provider import create_tts_provider
 from app.music.provider import create_music_provider
 from app.music.models import MusicTrack
+from app.music.recommender import SongRecommenderService
+from app.comments.queue import CommentIn, CommentQueue
+from app.session_logging.music_log import MusicEventLogger
 from app.clock.validator import validate_clock_semantics
 from app.orchestrator.clock_runner import clean_text_for_tts, resolve_station_audio
 
@@ -128,8 +131,11 @@ class ConnectionManager:
                 logger.warning("Error sending WS message: %s", e)
                 self.disconnect(connection)
 
-    async def broadcast_json(self, data: dict[str, Any]):
-        for connection in list(self.active_connections):
+    async def broadcast_json(self, data: dict[str, Any], roles: Optional[tuple[str, ...]] = None):
+        """Send to every client, or only to clients whose role is in ``roles``."""
+        for connection, role in list(self.active_connections.items()):
+            if roles is not None and role not in roles:
+                continue
             try:
                 await connection.send_json(data)
             except Exception as e:
@@ -172,6 +178,36 @@ music_provider = create_music_provider(
     fail_inject=settings.FAIL_INJECT,
 )
 
+# Rekomendasi lagu (hits_rec): dimuat di thread latar saat startup, tidak memblok server.
+recommender_service = SongRecommenderService(settings, music_provider)
+
+
+async def _broadcast_comment_event(event_type: str, data: dict[str, Any], roles: Optional[tuple[str, ...]]) -> None:
+    await ws_manager.broadcast_json({"type": event_type, "data": data}, roles=roles)
+
+
+# Log komentar + lagu terpilih + latensi per langkah: logs/{session_id}.music.jsonl
+music_event_log = MusicEventLogger(settings.LOG_DIR)
+
+# Komentar penonton (input operator): antrean request lagu + komentar umum untuk Talk.
+comment_queue = CommentQueue(
+    recommender_service,
+    broadcast=_broadcast_comment_event,
+    max_pending=settings.RECOMMENDER_MAX_PENDING,
+    event_log=music_event_log,
+)
+
+
+@app.on_event("startup")
+def _start_song_recommender() -> None:
+    recommender_service.start_loading()
+
+
+@app.on_event("shutdown")
+def _stop_song_recommender() -> None:
+    recommender_service.shutdown()
+
+
 current_engine: Optional[ConversationEngine] = None
 background_task: Optional[asyncio.Task] = None
 current_session_id: Optional[str] = None
@@ -212,6 +248,7 @@ def health_check():
         "tts_mode": settings.TTS_MODE,
         "active_session": current_session_id,
         "session_state": live_state().value,
+        "recommender": recommender_service.status_info(),
     }
 
 @app.get("/audio/{filename}")
@@ -262,6 +299,21 @@ def _presenter_voice(persona: str) -> str:
     if settings.TTS_PROVIDER == "elevenlabs":
         return (settings.ELEVENLABS_VOICE_A if male else settings.ELEVENLABS_VOICE_B) or ("male" if male else "female")
     return "Puck" if male else "Kore"
+
+
+@app.post("/api/comments")
+async def post_comment(req: CommentIn):
+    """Komentar penonton (diinput operator). Diklasifikasi di latar; hasilnya lewat WS."""
+    try:
+        entry, duplicate = await comment_queue.submit(req.username, req.text)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"duplicate": duplicate, "comment": entry.public()}
+
+
+@app.get("/api/comments")
+def list_comments(limit: int = 50):
+    return comment_queue.snapshot(limit=max(1, min(limit, 500)))
 
 
 @app.post("/api/tts/line")
@@ -693,6 +745,10 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         background_facts=["Penyiar radio hits Bandung", "Suka nonton konser"],
         do_not=["Jangan gunakan bahasa kaku"],
     )
+    # Voice from .env (TTS provider config) wins over the "voice" field in the persona files,
+    # so changing ELEVENLABS_VOICE_A/B or the Edge voices takes effect in the rundown.
+    persona_a = persona_a.model_copy(update={"voice": voice_a})
+    persona_b = persona_b.model_copy(update={"voice": voice_b})
 
     async def broadcast_clock_event(event: dict[str, Any]):
         await ws_manager.broadcast_json(event)
@@ -707,7 +763,12 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         broadcast_fn=broadcast_clock_event,
         demo_music_sec=req.demo_music_sec or 30,
         talk_turns_per_slot=req.talk_turns_per_slot or 2,
+        comment_queue=comment_queue,
+        recommender=recommender_service,
+        talk_mood=settings.RECOMMENDER_TALK_MOOD,
+        event_log=music_event_log,
     )
+    music_event_log.set_session(session_id)
 
     await clock_runner_instance.start(session_id)
     clock_runner_task = clock_runner_instance._run_task
@@ -718,6 +779,7 @@ async def stop_clock_session():
     global clock_runner_instance
     if clock_runner_instance:
         await clock_runner_instance.stop()
+    music_event_log.end_session()
     return {"status": "stopped"}
 
 @app.post("/api/clock/next")

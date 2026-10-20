@@ -3,7 +3,7 @@ import React from 'react';
 export default function NowPlayingMusic({ musicTrack, playbackState, slotElapsedSec }) {
   if (!musicTrack) return null;
 
-  const { title, artist, cover_url, image_url, preview_url, category } = musicTrack;
+  const { title, artist, cover_url, image_url, preview_url, category, requested_by, request_comment } = musicTrack;
   const artwork = cover_url || image_url;
 
   return (
@@ -37,6 +37,12 @@ export default function NowPlayingMusic({ musicTrack, playbackState, slotElapsed
           <p className="text-xs text-emerald-200/80 mt-0.5">
             {artist || 'Artis'}
           </p>
+          {requested_by && (
+            <p className="text-xs text-amber-300 mt-1 line-clamp-1" title={request_comment || ''}>
+              Request dari @{requested_by}
+              {request_comment && <span className="text-amber-200/70"> · “{request_comment}”</span>}
+            </p>
+          )}
         </div>
       </div>
 

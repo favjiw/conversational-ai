@@ -1,5 +1,6 @@
 import type { VRM } from '@pixiv/three-vrm';
 import { RestPose } from './RestPose';
+import { MusicGroove, type GrooveConfig } from './MusicGroove';
 import type { ExpressionAdapter } from '../expression/ExpressionAdapter';
 import type { ExpressionDriver } from '../expression/ExpressionDriver';
 
@@ -39,6 +40,9 @@ export class IdleManager {
 
   public isSpeaking = false;
 
+  /** Joget sederhana saat lagu diputar (lapisan di atas idle). */
+  private groove: MusicGroove;
+
   constructor(
     vrm: VRM,
     adapter: ExpressionAdapter,
@@ -50,9 +54,21 @@ export class IdleManager {
     this.expressionDriver = expressionDriver;
     this.config = config;
 
+    // Fase acak kecil: dua penyiar bergerak di tempo yang sama tapi tidak identik.
+    this.groove = new MusicGroove({}, Math.random() * 0.8);
+
     this.scheduleNextBlink();
     this.scheduleNextSaccade();
     RestPose.apply(this.vrm);
+  }
+
+  /** Nyalakan/matikan joget (dipanggil saat audio lagu mulai/berhenti). */
+  setMusicPlaying(playing: boolean): void {
+    this.groove.active = playing;
+  }
+
+  setGrooveConfig(config: Partial<GrooveConfig>): void {
+    this.groove.setConfig(config);
   }
 
   getConfig(): IdleConfig {
@@ -76,10 +92,16 @@ export class IdleManager {
     if (!humanoid) return;
 
     RestPose.apply(this.vrm);
+    // Tulang badan/kepala hanya ditulis lapisan idle: mulai dari nol tiap frame supaya
+    // tambahan gerakan joget tidak menumpuk antar-frame.
+    for (const bone of ['spine', 'chest', 'upperChest', 'neck', 'head'] as const) {
+      humanoid.getNormalizedBoneNode(bone)?.rotation.set(0, 0, 0);
+    }
     this.updateBlinking(deltaTime);
     this.updateBreathing(deltaTime, humanoid);
     this.updateHeadSway(deltaTime, humanoid);
     this.updateSaccades(deltaTime, humanoid);
+    this.groove.update(deltaTime, this.vrm);
   }
 
   private updateBlinking(deltaTime: number): void {

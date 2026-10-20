@@ -24,6 +24,8 @@ export interface LiveMusicData {
     title: string;
     artist: string;
     preview_url?: string;
+    /** Username penonton bila lagu ini request dari komentar. */
+    requested_by?: string;
   };
   preview_sec?: number;
   generation?: number;
@@ -73,7 +75,7 @@ export class LiveBroadcastAdapter {
   public onTurnChange?: (turn: { persona: 'persona_a' | 'persona_b'; persona_name: string; text: string; emotion?: string } | null) => void;
   public onSpeakingChange?: (persona: 'persona_a' | 'persona_b' | null) => void;
   public onSlotChange?: (slot: LiveSlotData | null) => void;
-  public onMusicChange?: (track: { title: string; artist: string; badge?: string } | null) => void;
+  public onMusicChange?: (track: { title: string; artist: string; badge?: string; requestedBy?: string } | null) => void;
   public onMusicProgress?: (percent: number) => void;
   public onCardModeChange?: (mode: 'talk' | 'song') => void;
   /** Topic of the current session theme (session mode "theme_change"). */
@@ -193,6 +195,7 @@ export class LiveBroadcastAdapter {
             this.musicAudio.pause();
             this.musicAudio.removeAttribute('src');
             this.musicAudio = null;
+            this.setMusicPlaying(false);
           }
         }
         break;
@@ -378,6 +381,7 @@ export class LiveBroadcastAdapter {
       title: track.title,
       artist: track.artist,
       badge: `NOW PLAYING • ${category}`,
+      requestedBy: track.requested_by || undefined,
     });
     this.onCardModeChange?.('song');
     this.setSpeaking(null);
@@ -393,17 +397,29 @@ export class LiveBroadcastAdapter {
     }
   }
 
+  private setMusicPlaying(playing: boolean): void {
+    for (const idle of this.idleManagers.values()) {
+      idle.setMusicPlaying(playing);
+    }
+  }
+
   private playMusicAudio(url: string, data: LiveMusicData): void {
     if (this.musicAudio) {
       this.musicAudio.pause();
       this.musicAudio.removeAttribute('src');
       this.musicAudio = null;
+      this.setMusicPlaying(false);
     }
 
     const audio = new Audio(url);
     audio.muted = !this.isAudioOwner;
     this.musicAudio = audio;
     const maxSec = data.preview_sec || 30;
+
+    // Penyiar berjoget hanya selama audio lagu benar-benar berputar.
+    audio.onplaying = () => {
+      if (this.musicAudio === audio) this.setMusicPlaying(true);
+    };
 
     audio.ontimeupdate = () => {
       if (this.musicAudio !== audio) return;
@@ -415,6 +431,7 @@ export class LiveBroadcastAdapter {
       if (audio.currentTime >= maxSec) {
         audio.pause();
         this.musicAudio = null;
+        this.setMusicPlaying(false);
         this.sendFeedback(data, 'ended');
       }
     };
@@ -422,12 +439,14 @@ export class LiveBroadcastAdapter {
     audio.onended = () => {
       if (this.musicAudio !== audio) return;
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     };
 
     audio.onerror = () => {
       if (this.musicAudio !== audio) return;
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     };
 
@@ -435,6 +454,7 @@ export class LiveBroadcastAdapter {
       if (this.holdIfAutoplayBlocked(audio, err)) return;
       console.warn('[LiveBroadcastAdapter] Music preview error:', err);
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     });
   }
@@ -485,6 +505,7 @@ export class LiveBroadcastAdapter {
       this.musicAudio.pause();
       this.musicAudio.removeAttribute('src');
       this.musicAudio = null;
+      this.setMusicPlaying(false);
     }
 
     for (const idle of this.idleManagers.values()) {
