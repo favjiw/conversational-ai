@@ -457,8 +457,13 @@ class EdgeTTSProvider(TTSProvider):
         pitch = self._female_pitch if is_female else self._male_pitch
 
         cleaned_text = text.replace("//", "... ").replace("/", ", ")
+        # aiohttp memakai aiodns bila terpasang; di laptop ini aiodns selalu timeout 20 s
+        # (DNS sistem langsung menjawab). ThreadedResolver = resolver sistem.
+        import aiohttp
+
         communicate = edge_tts.Communicate(
             cleaned_text, voice_id, rate=rate, pitch=pitch, boundary="WordBoundary",
+            connector=aiohttp.TCPConnector(resolver=aiohttp.ThreadedResolver()),
         )
         data = bytearray()
         timings: list[WordTiming] = []

@@ -178,6 +178,7 @@ class _SongPick:
     rec_timings: dict[str, float] = field(default_factory=dict)  # langkah hits_rec (mood Talk)
 
 
+TTS_LINE_TIMEOUT_SEC = 20.0  # satu baris TTS; lewat dari itu giliran tayang tanpa audio
 TALK_TURN_ESTIMATE_SEC = 12.0  # perkiraan durasi satu giliran sebelum ada data
 TALK_CLOSING_SEC = 30.0  # sisa waktu yang memicu giliran penutup
 TALK_MAX_CLOSING_TURNS = 2
@@ -213,7 +214,8 @@ class TalkBudget:
 
     def is_closing(self) -> bool:
         """Dipanggil engine sekali per giliran: True = giliran ini menutup Talk."""
-        closing = self.remaining <= max(self._closing_threshold, self.avg_turn * 1.2)
+        # Penutup bila sesudah giliran ini Talk kemungkinan berhenti (sisa <= 0,4 x rata-rata).
+        closing = self.remaining <= max(self._closing_threshold, self.avg_turn * 1.4)
         if closing:
             self.closing_turns += 1
         return closing
@@ -998,8 +1000,10 @@ class ClockRunner:
         spoken_text = clean_text_for_tts(text)
         try:
             if spoken_text:
-                audio_bytes, word_timings = await self.tts.synthesize_with_timings(
-                    spoken_text, speaker.voice or "male_voice",
+                # Batas waktu: TTS yang macet (jaringan) tidak boleh menahan Talk lama-lama.
+                audio_bytes, word_timings = await asyncio.wait_for(
+                    self.tts.synthesize_with_timings(spoken_text, speaker.voice or "male_voice"),
+                    timeout=TTS_LINE_TIMEOUT_SEC,
                 )
                 audio_dir = Path("cache/tts")
                 audio_dir.mkdir(parents=True, exist_ok=True)

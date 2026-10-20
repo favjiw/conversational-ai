@@ -87,6 +87,14 @@ class TestTalkBudget(unittest.TestCase):
             b.add(10)
         self.assertEqual(flags, [False, False, True])
 
+    def test_short_slot_with_long_turns_still_closes(self):
+        b = TalkBudget(30)  # kasus nyata 21 Okt: Ice Breaking, giliran ±13 s
+        flags = []
+        while not (b.turns and b.should_stop()):
+            flags.append(b.is_closing())
+            b.add(13)
+        self.assertEqual(flags, [False, True])
+
     def test_safety_limit_when_duration_unknown(self):
         b = TalkBudget(240)
         self.assertEqual(b.max_turns, 30)
