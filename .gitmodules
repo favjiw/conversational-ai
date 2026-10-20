@@ -1,0 +1,3 @@
+[submodule "external/hits-song-recommender"]
+	path = external/hits-song-recommender
+	url = https://github.com/ffromme/hits-song-recommender

@@ -14,7 +14,7 @@ Sistem penyiar AI untuk live streaming TikTok HITS Unikom Radio: dua penyiar AI 
 ## 2. Fitur wajib
 
 1. AI ngobrol dengan AI (dua penyiar AI).
-2. Rekomendasi musik berdasarkan emosi (lagu dari API musik).
+2. Rekomendasi musik berdasarkan emosi (lagu dari API musik). Keputusan 20 Okt 2026: komentar penonton yang meminta lagu (judul, artis, atau mood) dipetakan ke lagu katalog oleh modul hits-song-recommender (Iam), audionya dari Deezer. Tanpa request, slot lagu memakai Deezer per kategori.
 3. Karakter 3D untuk penyiar pria dan wanita, dengan lip-sync dan ekspresi dari audio TTS, dalam dua gaya yang bisa dipilih (keputusan 19 Okt 2026; sepasang penyiar selalu bergaya sama): **realistis** (GLB, rig, 52 blendshape ARKit, material PBR; halaman `/stage-3d-realistic`) dan **animasi/VTuber** (VRM; halaman `/stage-animation`). `/stage` memakai gaya default dari `avatar.config.json`.
 4. Membaca komentar TikTok lalu berimprovisasi: sebutkan username dan isi komentarnya, lalu jadikan topik sementara di dalam Tema yang sedang dibahas.
 
@@ -33,7 +33,7 @@ Alur saat ini di HITS: produser membuat Tema, Tema diserahkan ke penyiar, penyia
 ### B. Saat live
 5. Rundown Engine menjalankan item satu per satu sesuai urutan: audio statis diputar, SPOT/ADLIBS dibacakan lewat TTS, lagu diputar, dan slot Talk diserahkan ke Conversation Engine.
 6. Conversation Engine menangani Talk sesuai jenisnya (bagian 5). Talk selesai jika durasi slot habis dan semua isi wajib (misalnya pengingat ajakan) sudah disampaikan.
-7. Komentar TikTok dikumpulkan ke antrean sepanjang live, disaring, lalu dibawa ke segmen Talk berikutnya sebagai pesan pendengar. Komentar tidak memotong lagu.
+7. Komentar TikTok dikumpulkan ke antrean sepanjang live, disaring, lalu dibawa ke segmen Talk berikutnya sebagai pesan pendengar. Komentar tidak memotong lagu. Setiap komentar diklasifikasi: request lagu diputar di slot lagu berikutnya (kecuali slot korea) dan intro lagunya menyebut username serta isi request; komentar biasa menunggu segmen Talk; komentar yang perlu moderasi ditolak dan hanya terlihat oleh operator.
 8. Per ucapan: teks, lalu Supervisor, lalu TTS, lalu avatar, lalu ditangkap TikTok LIVE Studio. Giliran berikutnya dibuat saat audio giliran sekarang masih diputar (pipelining), supaya tidak ada jeda kosong.
 9. Operator bisa melewati item atau menghentikan sesi kapan saja.
 
@@ -76,6 +76,7 @@ Istilah: 3M = Mencoba Mengerti Mahasiswa (penyiar berperan sebagai "Pak Dosen Ag
 - Teks LLM harus ditulis untuk diucapkan: kalimat pendek, gaya "gue/lu", ada sahutan dan tawa, tanpa markdown. Transcript on-air HITS dipakai sebagai contoh gaya di prompt.
 - Avatar: dua gaya (GLB realistis dengan 52 blendshape ARKit, atau VRM anime), dirender three.js di halaman stage repo ini. Lip-sync kedua gaya berbasis viseme dari teks dan timestamp kata TTS (bentuk viseme model untuk GLB, lima vokal VRM untuk anime), cadangan dari amplitudo audio. Prototipe lama di repo char-3d diarsipkan.
 - Komentar TikTok: library tidak resmi (misalnya TikTokLive untuk Python). Cadangan: komentar diinput manual oleh operator.
+- Rekomendasi lagu: modul hits-song-recommender (git submodule `external/hits-song-recommender`, kode rekan tidak diedit). LLM-nya Groq `qwen/qwen3.8-27b`, terpisah dari kuota Gemini; embedding `intfloat/multilingual-e5-small` dan ChromaDB berjalan lokal. Batas waktu 8 detik; bila gagal, slot lagu kembali ke Deezer per kategori.
 
 ## 8. Risiko dan kepatuhan
 
@@ -86,6 +87,6 @@ Istilah: 3M = Mencoba Mengerti Mahasiswa (penyiar berperan sebagai "Pak Dosen Ag
 ## 9. Belum diputuskan
 
 - Apakah News dan Traffic Info dimasukkan ke rundown 1 jam.
-- Emosi yang dipakai untuk rekomendasi musik: emosi topik Talk atau emosi komentar penonton.
+- Emosi yang dipakai untuk rekomendasi musik: emosi/mood dari komentar penonton sudah dipakai untuk request (20 Okt 2026). Emosi topik Talk tersedia di belakang flag `RECOMMENDER_TALK_MOOD` (default mati) dan belum diputuskan.
 - Apakah Supervisor ikut berjalan saat live atau hanya dipakai di eksperimen (mempertimbangkan latensi).
 - Bahan eksperimen: 36 pertanyaan Aron, Tema HITS, atau keduanya.

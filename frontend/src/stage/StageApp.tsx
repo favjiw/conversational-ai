@@ -98,6 +98,7 @@ export interface MusicTrackData {
   title: string;
   artist: string;
   badge?: string;
+  requestedBy?: string;
 }
 
 const DEFAULT_DEMO_TRACK: MusicTrackData = {
@@ -574,7 +575,7 @@ export function StageApp() {
   // Right-column card: song while music plays, the talk topic, or the cue on air
   const slotType = currentSlot?.slot_type;
   const infoCard: InfoCard = isSongMode && activeMusicTrack
-    ? { kind: 'song', title: activeMusicTrack.title, artist: activeMusicTrack.artist, badge: activeMusicTrack.badge, progress: songProgress }
+    ? { kind: 'song', title: activeMusicTrack.title, artist: activeMusicTrack.artist, badge: activeMusicTrack.badge, requestedBy: activeMusicTrack.requestedBy, progress: songProgress }
     : slotType === 'song'
       // Song slot before the music starts: the presenters are introducing it
       ? { kind: 'talk', label: currentSlot?.label || 'Lagu', badge: 'LAGU BERIKUTNYA' }

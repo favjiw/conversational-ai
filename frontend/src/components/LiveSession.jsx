@@ -5,6 +5,7 @@ import SpeakerCards from './SpeakerCards';
 import TranscriptCard from './TranscriptCard';
 import ClockRundownTimeline from './ClockRundownTimeline';
 import NowPlayingMusic from './NowPlayingMusic';
+import CommentPanel from './CommentPanel';
 import Footer from './Footer';
 import { useLiveSession } from '../hooks/useLiveSession';
 
@@ -39,6 +40,8 @@ export default function LiveSession() {
     slotElapsedSec,
     handleSkipNext,
     stageConnected,
+    commentQueue,
+    submitComment,
   } = useLiveSession();
 
   return (
@@ -83,6 +86,8 @@ export default function LiveSession() {
           {musicTrack && (
             <NowPlayingMusic musicTrack={musicTrack} playbackState={playbackState} slotElapsedSec={slotElapsedSec} />
           )}
+
+          <CommentPanel commentQueue={commentQueue} submitComment={submitComment} />
 
           <SpeakerCards
             personaA={personaA}

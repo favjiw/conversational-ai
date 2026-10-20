@@ -184,6 +184,7 @@
 .stage-app .ph-info-badge { font-size: 0.7em; font-weight: 800; letter-spacing: 0.08em; color: #fbbf24; }
 .stage-app .ph-info-title { font-weight: 800; line-height: 1.25; }
 .stage-app .ph-info-sub { opacity: 0.75; font-size: 0.85em; }
+.stage-app .ph-info-request { font-size: 0.8em; font-weight: 700; color: #fbbf24; }
 .stage-app .ph-progress { height: calc(6px * var(--u)); border-radius: 3px; background: rgba(255, 255, 255, 0.2); overflow: hidden; margin-top: 0.3em; }
 .stage-app .ph-progress > div { height: 100%; background: #f59e0b; transition: width 0.5s linear; }
 

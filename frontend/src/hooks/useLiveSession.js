@@ -42,6 +42,8 @@ export function useLiveSession() {
   const isAudioOwnerRef = useRef(true);
   const [isAudioOwner, setIsAudioOwner] = useState(true);
   const [stageConnected, setStageConnected] = useState(false);
+  // Antrean komentar penonton + status layanan rekomendasi lagu (event comment_queue).
+  const [commentQueue, setCommentQueue] = useState({ recommender: null, comments: [], waiting: 0 });
 
   const stopLocalAudio = () => {
     const audio = currentAudioRef.current;
@@ -81,6 +83,43 @@ export function useLiveSession() {
     return `${m}:${sec}`;
   };
 
+  const loadComments = () => {
+    fetch(`http://${window.location.hostname}:8000/api/comments`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCommentQueue(data);
+      })
+      .catch((err) => console.warn('Failed loading comments:', err));
+  };
+
+  // Model rekomendasi dimuat ±30 s di backend: cek ulang statusnya sampai tidak "loading" lagi.
+  const recommenderStatus = commentQueue.recommender?.status;
+  useEffect(() => {
+    if (recommenderStatus !== 'loading') return undefined;
+    const timer = setTimeout(loadComments, 3000);
+    return () => clearTimeout(timer);
+  }, [recommenderStatus, commentQueue]);
+
+  // Komentar penonton (input operator). Mengembalikan pesan galat atau null.
+  const submitComment = async (username, text) => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:8000/api/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, text }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const detail = body?.detail;
+        return typeof detail === 'string' ? detail : 'Komentar tidak valid (username wajib, maks 300 karakter).';
+      }
+      const body = await res.json();
+      return body.duplicate ? 'Komentar yang sama sudah masuk, diabaikan.' : null;
+    } catch {
+      return 'Backend tidak bisa dihubungi.';
+    }
+  };
+
   // Fetch Clock Rundown Slots on mount
   useEffect(() => {
     fetch(`http://${window.location.hostname}:8000/api/clock/pagi-bener`)
@@ -96,7 +135,10 @@ export function useLiveSession() {
     const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/session?role=console`;
     wsRef.current = new WebSocket(wsUrl);
 
-    wsRef.current.onopen = () => setWsConnected(true);
+    wsRef.current.onopen = () => {
+      setWsConnected(true);
+      loadComments();
+    };
     wsRef.current.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -124,6 +166,8 @@ export function useLiveSession() {
             setActiveSpeaker(msg.data.persona || null);
             setPlaybackState(msg.data.persona ? 'playing' : 'loading');
           }
+        } else if (msg.type === 'comment_queue') {
+          setCommentQueue(msg.data);
         } else if (msg.type === 'theme_change') {
           setCurrentTheme(msg.data);
         } else if (msg.type === 'turn') {
@@ -463,5 +507,7 @@ export function useLiveSession() {
     cueSlot,
     isAudioOwner,
     stageConnected,
+    commentQueue,
+    submitComment,
   };
 }

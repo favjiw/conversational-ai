@@ -24,6 +24,8 @@ export interface LiveMusicData {
     title: string;
     artist: string;
     preview_url?: string;
+    /** Username penonton bila lagu ini request dari komentar. */
+    requested_by?: string;
   };
   preview_sec?: number;
   generation?: number;
@@ -73,7 +75,7 @@ export class LiveBroadcastAdapter {
   public onTurnChange?: (turn: { persona: 'persona_a' | 'persona_b'; persona_name: string; text: string; emotion?: string } | null) => void;
   public onSpeakingChange?: (persona: 'persona_a' | 'persona_b' | null) => void;
   public onSlotChange?: (slot: LiveSlotData | null) => void;
-  public onMusicChange?: (track: { title: string; artist: string; badge?: string } | null) => void;
+  public onMusicChange?: (track: { title: string; artist: string; badge?: string; requestedBy?: string } | null) => void;
   public onMusicProgress?: (percent: number) => void;
   public onCardModeChange?: (mode: 'talk' | 'song') => void;
   /** Topic of the current session theme (session mode "theme_change"). */
@@ -378,6 +380,7 @@ export class LiveBroadcastAdapter {
       title: track.title,
       artist: track.artist,
       badge: `NOW PLAYING • ${category}`,
+      requestedBy: track.requested_by || undefined,
     });
     this.onCardModeChange?.('song');
     this.setSpeaking(null);
