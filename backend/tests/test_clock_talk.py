@@ -33,9 +33,12 @@ class FakeLLM:
                            model="fake")
 
 
-def _runner(slot_sec, llm, line_sec=10.0, play_sec=0.0, talk_turns=None):
-    slot = Slot(id="t1", order=1, type=SlotType.TALK, source=SlotSource.LLM_CONVERSATION, duration_sec=slot_sec,
-                tema=Tema(title="Serba-serbi Ospek", mode=TemaMode.IMPROV, content="Tips ospek"))
+_DEFAULT_TEMA = Tema(title="Serba-serbi Ospek", mode=TemaMode.IMPROV, content="Tips ospek")
+
+
+def _runner(slot_sec, llm, line_sec=10.0, play_sec=0.0, talk_turns=None, slot_id="t1", tema=_DEFAULT_TEMA):
+    slot = Slot(id=slot_id, order=1, type=SlotType.TALK, source=SlotSource.LLM_CONVERSATION, duration_sec=slot_sec,
+                tema=tema)
     clock = Clock(show="t", duration_min=1, slots=[slot])
     tts = MagicMock()
     tts.provider_name = "mock"
@@ -54,6 +57,12 @@ def _runner(slot_sec, llm, line_sec=10.0, play_sec=0.0, talk_turns=None):
 
     runner._synthesize_line = synth
     runner._play_line = play
+    runner.events = []
+
+    async def emit(event_type, data):
+        runner.events.append((event_type, data))
+
+    runner.emit_event = emit
     return runner, slot
 
 
@@ -143,6 +152,39 @@ class TestDurationTalk(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(asyncio.CancelledError):
             await task
         self.assertEqual(runner.played, [])  # audio yang berjalan dibatalkan
+
+
+
+class TestTalkPoints(unittest.IsolatedAsyncioTestCase):
+    def test_long_talk_slots_have_points_and_s21_ends_with_teaser(self):
+        from app.orchestrator.clock_runner import load_tema_library, load_tema_points
+
+        points = load_tema_points()
+        for slot_id in ("s10", "s13", "s21", "s30", "s40", "s41"):
+            self.assertGreaterEqual(len(points.get(slot_id, [])), 3, slot_id)
+        self.assertIn("3M", points["s21"][-1]["title"])
+        self.assertIn("Say Hi", load_tema_library()["s21"].title)
+
+    async def test_points_follow_elapsed_time_without_wrapping(self):
+        llm = FakeLLM()
+        # s21: 5 poin, slot 120 s, giliran 10 s = 12 giliran
+        runner, slot = _runner(slot_sec=120, llm=llm, line_sec=10, slot_id="s21", tema=None)
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        changes = [d["point_index"] for t, d in runner.events if t == "theme_change"]
+        self.assertEqual(changes, [0, 1, 2, 3, 4])  # berurutan, tanpa kembali ke awal
+        self.assertIn("Teaser 3M", runner.events[-1][1]["title"])
+        self.assertIn("Segmen 3M hadir sebentar lagi", llm.prompts[-1])  # poin terakhir = teaser
+        self.assertNotIn("Segmen 3M hadir sebentar lagi", llm.prompts[0])
+
+    async def test_slot_without_material_uses_logged_fallback(self):
+        llm = FakeLLM()
+        empty = Tema(title="Talk Kosong", mode=TemaMode.IMPROV, content=None)
+        runner, slot = _runner(slot_sec=20, llm=llm, line_sec=10, slot_id="tanpa_materi", tema=empty)
+        with self.assertLogs("app.orchestrator.clock_runner", level="WARNING") as logs:
+            await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        self.assertTrue(any("no Tema material" in m for m in logs.output))
+        self.assertIn("Obrolan santai", llm.prompts[0])
+        self.assertEqual([t for t, _ in runner.events if t == "theme_change"], [])
 
 
 if __name__ == "__main__":

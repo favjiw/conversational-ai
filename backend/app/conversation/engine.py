@@ -471,6 +471,7 @@ class ConversationEngine:
         should_stop: Optional[Callable[[], bool]] = None,
         is_closing: Optional[Callable[[], bool]] = None,
         turn_extras: Optional[Callable[[int, bool], list[str]]] = None,
+        theme_index_fn: Optional[Callable[[int], int]] = None,
     ) -> list[TurnLog]:
         """Run a full Talk slot conversation.
 
@@ -479,9 +480,10 @@ class ConversationEngine:
 
         Mode clock (Talk berbasis durasi): ``should_stop`` is checked before every turn
         after the first (``max_turns`` stays the safety limit), ``is_closing`` marks closing
-        turns (prompt ``TALK_CLOSING_HINT``, logged as ``wrap_up``), and
-        ``turn_extras(turn_idx, closing)`` returns extra prompt lines for that turn.
-        All default to the previous behaviour.
+        turns (prompt ``TALK_CLOSING_HINT``, logged as ``wrap_up``),
+        ``turn_extras(turn_idx, closing)`` returns extra prompt lines for that turn, and
+        ``theme_index_fn(turn_idx)`` picks the playlist point from elapsed Talk time (no
+        wrap-around, the last point stays until the end). All default to the previous behaviour.
 
         Args:
             tema: Default topic for this slot.
@@ -520,15 +522,22 @@ class ConversationEngine:
                 logger.info("Slot %s stops after %d turns (time budget)", slot_id, turn_idx)
                 break
 
-            # Check theme rotation
-            if (
+            # Check theme rotation: by elapsed Talk time (mode clock) or every turns_per_theme turns
+            next_theme_idx: Optional[int] = None
+            if theme_playlist and theme_index_fn is not None:
+                wanted = max(0, min(len(theme_playlist) - 1, theme_index_fn(turn_idx)))
+                if wanted != current_theme_idx:
+                    next_theme_idx = wanted
+            elif (
                 theme_playlist
                 and turns_per_theme > 0
                 and turn_idx > 0
                 and turn_idx % turns_per_theme == 0
             ):
+                next_theme_idx = (turn_idx // turns_per_theme) % len(theme_playlist)
+            if next_theme_idx is not None:
                 previous_theme = current_tema
-                current_theme_idx = (turn_idx // turns_per_theme) % len(theme_playlist)
+                current_theme_idx = next_theme_idx
                 current_tema = theme_playlist[current_theme_idx]
                 self._theme_counter += 1
                 logger.info(
@@ -551,7 +560,9 @@ class ConversationEngine:
             self._state.turn_number = turn_idx + 1
 
             # Is this the last turn of the current theme? (FR-4 wrap_up rule)
-            if theme_playlist and turns_per_theme > 0:
+            if should_stop is not None or theme_index_fn is not None:
+                last_turn_in_theme = False  # Talk berbasis durasi: penutup ditentukan is_closing
+            elif theme_playlist and turns_per_theme > 0:
                 last_turn_in_theme = (turn_idx % turns_per_theme) == (turns_per_theme - 1)
             else:
                 last_turn_in_theme = (turn_idx == max_turns - 1)

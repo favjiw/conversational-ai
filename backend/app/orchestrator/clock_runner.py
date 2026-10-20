@@ -91,6 +91,31 @@ def resolve_station_audio(asset: Optional[str]) -> Optional[Path]:
 TEMA_LIBRARY_PATH = Path(__file__).resolve().parent.parent / "data" / "tema"
 
 
+def load_tema_points() -> dict[str, list[dict[str, str]]]:
+    """Poin/sub-topik per slot Talk ('points' di data/tema/*.json) untuk Talk panjang."""
+    points: dict[str, list[dict[str, str]]] = {}
+    if not TEMA_LIBRARY_PATH.exists():
+        return points
+    import json
+
+    for f in TEMA_LIBRARY_PATH.glob("*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for slot_id, entry in data.items():
+            if slot_id.startswith("_") or not isinstance(entry, dict):
+                continue
+            items = [
+                {"title": str(pt.get("title") or f"Poin {i + 1}"), "content": str(pt.get("content") or "")}
+                for i, pt in enumerate(entry.get("points") or [])
+                if isinstance(pt, dict) and pt.get("content")
+            ]
+            if items:
+                points[slot_id] = items
+    return points
+
+
 def load_tema_library() -> dict[str, Tema]:
     """Load the radio topic library from data/tema/*.json (FR-8)."""
     library: dict[str, Tema] = {}
@@ -243,6 +268,7 @@ class ClockRunner:
         self.demo_music_sec = demo_music_sec
         self.talk_turns_per_slot = talk_turns_per_slot
         self._tema_library = load_tema_library()
+        self._tema_points = load_tema_points()
 
         self._state = SessionState.IDLE
         self._session_id = ""
@@ -776,12 +802,30 @@ class ClockRunner:
             on_turn=on_turn,
         )
 
+        # Talk panjang: poin materi dibawakan berurutan mengikuti waktu yang sudah terucap.
+        playlist = self._talk_playlist(slot, tema) if budget else None
+
+        def theme_index(_turn_idx: int) -> int:
+            return int(budget.spoken / budget.target * len(playlist)) if budget and playlist else 0
+
+        async def on_theme_change(point: Tema, idx: int) -> None:
+            await self.emit_event("theme_change", {
+                "slot_id": slot.id,
+                "title": point.title,
+                "guidance": point.guidance,
+                "point_index": idx,
+                "point_total": len(playlist or []),
+            })
+
         try:
             await engine.run_slot(
                 tema=tema,
                 max_turns=max_turns,
                 slot_id=slot.id,
                 on_turn=on_turn,
+                theme_playlist=playlist,
+                on_theme_change=on_theme_change if playlist else None,
+                theme_index_fn=theme_index if playlist else None,
                 should_stop=budget.should_stop if budget else None,
                 is_closing=budget.is_closing if budget else None,
             )
@@ -813,10 +857,26 @@ class ClockRunner:
             if lib_entry is not None:
                 tema = lib_entry
 
-        if tema is None:
-            title = slot.label or "Obrolan Pagi Bener"
-            tema = Tema(title=title, mode=TemaMode.IMPROV, content=title, guidance="Obrolan santai penyiar")
+        if tema is None or not (tema.content or "").strip():
+            title = (tema.title if tema else None) or slot.label or "Obrolan Pagi Bener"
+            logger.warning("Talk %s (%s) has no Tema material; using a generic fallback topic", slot.id, title)
+            tema = Tema(
+                title=title,
+                mode=tema.mode if tema else TemaMode.IMPROV,
+                content=f"{title}. Obrolan santai seputar keseharian mahasiswa dan anak muda Bandung.",
+                guidance=(tema.guidance if tema and tema.guidance else "Obrolan santai penyiar"),
+            )
         return tema
+
+    def _talk_playlist(self, slot: Slot, tema: Tema) -> Optional[list[Tema]]:
+        """Poin materi slot (pagi_bener.json 'points') sebagai playlist Tema, atau None."""
+        points = self._tema_points.get(slot.id) or []
+        if len(points) < 2:
+            return None
+        return [
+            Tema(title=f"{tema.title}: {p['title']}", mode=tema.mode, content=p["content"], guidance=tema.guidance)
+            for p in points
+        ]
 
     async def _handle_adlibs_slot(self, slot: Slot, idx: int) -> None:
         adlib_text = SAMPLE_ADLIBS[idx % len(SAMPLE_ADLIBS)]
