@@ -152,6 +152,54 @@ class _SongPick:
     rec_timings: dict[str, float] = field(default_factory=dict)  # langkah hits_rec (mood Talk)
 
 
+TALK_TURN_ESTIMATE_SEC = 12.0  # perkiraan durasi satu giliran sebelum ada data
+TALK_CLOSING_SEC = 30.0  # sisa waktu yang memicu giliran penutup
+TALK_MAX_CLOSING_TURNS = 2
+TALK_SAFETY_SEC_PER_TURN = 8  # batas aman: maks duration_sec // 8 giliran
+
+
+class TalkBudget:
+    """Anggaran waktu satu slot Talk (mode clock), dihitung dari durasi audio giliran.
+
+    Talk berhenti saat sisa waktu kurang dari setengah giliran rata-rata, setelah dua giliran
+    penutup, atau saat batas aman jumlah giliran tercapai (bila estimasi durasi meleset).
+    """
+
+    def __init__(self, target_sec: float) -> None:
+        self.target = max(1.0, float(target_sec))
+        self.spoken = 0.0
+        self.turns = 0
+        self.closing_turns = 0
+        self.max_turns = max(2, int(self.target // TALK_SAFETY_SEC_PER_TURN))
+        self._closing_threshold = min(TALK_CLOSING_SEC, self.target / 4)
+
+    @property
+    def remaining(self) -> float:
+        return self.target - self.spoken
+
+    @property
+    def avg_turn(self) -> float:
+        return self.spoken / self.turns if self.turns and self.spoken > 0 else TALK_TURN_ESTIMATE_SEC
+
+    def add(self, duration_sec: float) -> None:
+        self.spoken += max(0.0, duration_sec)
+        self.turns += 1
+
+    def is_closing(self) -> bool:
+        """Dipanggil engine sekali per giliran: True = giliran ini menutup Talk."""
+        closing = self.remaining <= max(self._closing_threshold, self.avg_turn * 1.2)
+        if closing:
+            self.closing_turns += 1
+        return closing
+
+    def should_stop(self) -> bool:
+        return (
+            self.remaining <= self.avg_turn * 0.4
+            or self.closing_turns >= TALK_MAX_CLOSING_TURNS
+            or self.turns >= self.max_turns
+        )
+
+
 # Slot categories never used for viewer requests (keeps the rundown's colour, e.g. the K-pop slot).
 REQUEST_EXCLUDED_CATEGORIES = {"korea"}
 MAX_REQUEST_TRIES = 3  # requests tried per slot when their audio cannot be found
@@ -171,7 +219,7 @@ class ClockRunner:
         supervisor_client: Optional[LLMClient] = None,
         broadcast_fn: Optional[Callable[[dict], Coroutine]] = None,
         demo_music_sec: int = 30,
-        talk_turns_per_slot: int = 2,
+        talk_turns_per_slot: Optional[int] = None,  # None = Talk berbasis durasi slot
         comment_queue: Optional[Any] = None,
         recommender: Optional[Any] = None,
         talk_mood: bool = False,
@@ -699,12 +747,26 @@ class ClockRunner:
 
     async def _handle_talk_slot(self, slot: Slot) -> None:
         tema = self._resolve_tema(slot)
+        started = time.perf_counter()
+
+        # Talk berbasis durasi slot; talk_turns_per_slot (bila diisi) hanya override demo cepat.
+        budget = TalkBudget(slot.duration_sec) if self.talk_turns_per_slot is None else None
+        max_turns = budget.max_turns if budget else self.talk_turns_per_slot
+
+        # Pipelining (KEPUTUSAN §3.B.8): audio giliran n diputar di task latar sementara
+        # engine sudah membuat teks + TTS giliran n+1. Audio tetap berurutan.
+        playing: Optional[asyncio.Task] = None
 
         async def on_turn(turn_log) -> None:
+            nonlocal playing
             speaker = self.persona_a if turn_log.persona == self.persona_a.id else self.persona_b
             emotion_str = turn_log.emotion.value if hasattr(turn_log.emotion, "value") else str(turn_log.emotion)
-            # wait_spoken=True ensures Turn 1 finishes speaking before Turn 2 is generated
-            await self._speak_turn(slot.id, speaker, turn_log.final_text, emotion=emotion_str, wait_spoken=True)
+            line = await self._synthesize_line(speaker, turn_log.final_text, emotion_str)
+            if budget:
+                budget.add(line.duration_sec)
+            if playing is not None:
+                await playing
+            playing = asyncio.create_task(self._play_line(slot.id, line, wait_spoken=True))
 
         engine = ConversationEngine(
             persona_a=self.persona_a,
@@ -714,12 +776,28 @@ class ClockRunner:
             on_turn=on_turn,
         )
 
-        await engine.run_slot(
-            tema=tema,
-            max_turns=self.talk_turns_per_slot,
-            slot_id=slot.id,
-            on_turn=on_turn,
-        )
+        try:
+            await engine.run_slot(
+                tema=tema,
+                max_turns=max_turns,
+                slot_id=slot.id,
+                on_turn=on_turn,
+                should_stop=budget.should_stop if budget else None,
+                is_closing=budget.is_closing if budget else None,
+            )
+            if playing is not None:
+                await playing
+        finally:
+            # Skip/stop: hentikan audio giliran yang masih berjalan.
+            if playing is not None and not playing.done():
+                playing.cancel()
+
+        if budget:
+            logger.info(
+                "Talk %s done: %d turns, %.0fs spoken of %.0fs target (%d closing), %.0fs wall",
+                slot.id, budget.turns, budget.spoken, budget.target, budget.closing_turns,
+                time.perf_counter() - started,
+            )
 
     def _resolve_tema(self, slot: Slot) -> Tema:
         # Prefer slot.tema (from clock) then the tema library, then fallback (FR-8)

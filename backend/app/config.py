@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     GEMINI_MODEL_EMOTION: str = "gemini-3.5-flash-lite"
     GEMINI_MODEL_JUDGE: str = "gemini-flash-latest"
     GEMINI_MODEL_TTS: str = "gemini-3.8-flash-tts"
+    # Batas request per menit per model Gemini (rate_limiter.py). Talk berbasis durasi butuh ±4-5 RPM
+    # untuk persona; naikkan bila kuota free tier model mengizinkan (cek di AI Studio).
+    GEMINI_RPM: int = 5
 
     # --- TTS ---
     TTS_PROVIDER: Literal["gemini", "elevenlabs", "edge", "voicestudio"] = "edge"

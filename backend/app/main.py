@@ -146,7 +146,7 @@ ws_manager = ConnectionManager()
 
 # ── App State & Engine Singletons ───────────────────────────────────────────
 
-rate_limiter_registry = RateLimiterRegistry(default_rpm=5)
+rate_limiter_registry = RateLimiterRegistry(default_rpm=settings.GEMINI_RPM)
 
 llm_client = create_llm_client(
     mode=settings.LLM_MODE,
@@ -707,7 +707,7 @@ def get_pagi_bener_clock():
 
 class StartClockRequest(BaseModel):
     demo_music_sec: Optional[int] = 30
-    talk_turns_per_slot: Optional[int] = 2
+    talk_turns_per_slot: Optional[int] = None  # None = Talk mengikuti durasi slot; angka = override demo
 
 @app.post("/api/clock/start")
 async def start_clock_session(req: StartClockRequest = StartClockRequest()):
@@ -762,7 +762,7 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         music_provider=music_provider,
         broadcast_fn=broadcast_clock_event,
         demo_music_sec=req.demo_music_sec or 30,
-        talk_turns_per_slot=req.talk_turns_per_slot or 2,
+        talk_turns_per_slot=req.talk_turns_per_slot or None,
         comment_queue=comment_queue,
         recommender=recommender_service,
         talk_mood=settings.RECOMMENDER_TALK_MOOD,

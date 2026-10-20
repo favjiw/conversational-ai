@@ -514,14 +514,15 @@ export class LiveBroadcastAdapter {
     this.setSpeaking(null);
   }
 
-  public async startClockBroadcast(talkTurns = 2, demoMusicSec = 30): Promise<any> {
+  /** talkTurns: override demo cepat; kosong = Talk mengikuti durasi slot di rundown. */
+  public async startClockBroadcast(talkTurns?: number, demoMusicSec = 30): Promise<any> {
     await this.audioManager.initialize();
     const res = await fetch(`http://${window.location.hostname}:8000/api/clock/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         demo_music_sec: demoMusicSec,
-        talk_turns_per_slot: talkTurns,
+        ...(talkTurns ? { talk_turns_per_slot: talkTurns } : {}),
       }),
     });
     return res.json();

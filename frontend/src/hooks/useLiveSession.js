@@ -414,7 +414,6 @@ export function useLiveSession() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             demo_music_sec: 30,
-            talk_turns_per_slot: 2,
           }),
         });
         const data = await res.json();
