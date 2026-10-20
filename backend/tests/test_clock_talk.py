@@ -264,5 +264,52 @@ class TestCommentsInTalk(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any("Komentar penonton" in p for p in llm.prompts))
 
 
+
+class TestHitsStyle(unittest.IsolatedAsyncioTestCase):
+    async def test_style_hints_only_where_relevant(self):
+        from app.conversation.hits_style import CLOSING_STYLE_HINT, GREETING_HINT, OPENING_HINT, STYLE_GUIDE
+
+        llm = FakeLLM()
+        runner, slot = _runner(slot_sec=100, llm=llm, line_sec=10)
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        self.assertTrue(all(STYLE_GUIDE in p for p in llm.prompts))
+        self.assertIn(OPENING_HINT, llm.prompts[0])
+        self.assertEqual(sum(OPENING_HINT in p for p in llm.prompts), 1)
+        greetings = sum(GREETING_HINT in p for p in llm.prompts)
+        self.assertTrue(1 <= greetings <= len(llm.prompts) // 3)  # sesekali, bukan tiap giliran
+        self.assertIn(CLOSING_STYLE_HINT, llm.prompts[-1])
+        self.assertNotIn(CLOSING_STYLE_HINT, llm.prompts[0])
+
+    async def test_talk_right_after_song_opens_with_recap(self):
+        llm = FakeLLM()
+        runner, slot = _runner(slot_sec=30, llm=llm, line_sec=10)
+        runner._current_slot_idx = 4
+        runner._last_song = {"slot_idx": 3, "title": "Hati-Hati di Jalan", "artist": "Tulus", "requested_by": "andi"}
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        self.assertIn("Hati-Hati di Jalan", llm.prompts[0])
+        self.assertIn("request dari andi", llm.prompts[0])
+        self.assertIn("rekap", llm.prompts[0])
+
+    async def test_no_recap_when_song_was_not_the_previous_slot(self):
+        llm = FakeLLM()
+        runner, slot = _runner(slot_sec=30, llm=llm, line_sec=10)
+        runner._current_slot_idx = 8
+        runner._last_song = {"slot_idx": 3, "title": "Hati-Hati di Jalan", "artist": "Tulus", "requested_by": ""}
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        self.assertNotIn("Hati-Hati di Jalan", llm.prompts[0])
+
+    async def test_session_mode_prompts_unchanged(self):
+        from app.conversation.hits_style import STYLE_GUIDE
+
+        llm = FakeLLM()
+        engine = ConversationEngine(persona_a=_persona("a", "Raka"), persona_b=_persona("b", "Salsa"), llm_client=llm)
+        await engine.run_slot(tema=_DEFAULT_TEMA, slot_id="live", max_turns=3)
+        self.assertEqual(len(llm.prompts), 3)
+        for p in llm.prompts:
+            self.assertNotIn(STYLE_GUIDE, p)
+            self.assertNotIn(TALK_CLOSING_HINT, p)
+            self.assertTrue(p.endswith("Sekarang giliranmu bicara. Balas dalam JSON."))
+
+
 if __name__ == "__main__":
     unittest.main()

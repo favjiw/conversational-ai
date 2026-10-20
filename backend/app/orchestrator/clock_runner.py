@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable, Coroutine, Optional
 
 from app.conversation.engine import ConversationEngine
+from app.conversation.hits_style import style_extras
 from app.llm.client import LLMClient
 from app.music.models import MusicTrack
 from app.music.provider import MusicProvider
@@ -288,6 +289,8 @@ class ClockRunner:
         self.event_log = event_log  # MusicEventLogger: lagu terpilih + latensi per langkah
         self.comment_every_turns = comment_every_turns  # komentar umum dibacakan tiap N giliran Talk
         self._background: set[asyncio.Task] = set()
+        # Lagu terakhir yang on air: Talk tepat sesudahnya dibuka dengan rekap lagu (gaya HITS).
+        self._last_song: Optional[dict[str, Any]] = None
 
         self.demo_music_sec = demo_music_sec
         self.talk_turns_per_slot = talk_turns_per_slot
@@ -782,6 +785,8 @@ class ClockRunner:
 
             await self._mark_on_air(prepared)
             on_air = True
+            self._last_song = {"slot_idx": idx, "title": prepared.track.title, "artist": prepared.track.artist,
+                               "requested_by": prepared.track.requested_by}
             if self.event_log is not None:
                 self.event_log.log("song_on_air", slot_id=slot.id, rec_source=prepared.track.rec_source,
                                    title=prepared.track.title, artist=prepared.track.artist,
@@ -841,7 +846,14 @@ class ClockRunner:
         # Komentar penonton dan request lagu yang antre disisipkan ke instruksi giliran.
         last_mention = {"comment": 2 - max(1, self.comment_every_turns), "request": -REQUEST_MENTION_GAP_TURNS}
 
+        # Gaya penyiar HITS (pembuka/rekap lagu, sapaan sesekali, penutup) + komentar penonton.
+        previous_song = (self._last_song if self._last_song
+                         and self._last_song["slot_idx"] == self._current_slot_idx - 1 else None)
+
         def turn_extras(turn_idx: int, closing: bool) -> list[str]:
+            return style_extras(turn_idx, closing, previous_song) + audience_extras(turn_idx, closing)
+
+        def audience_extras(turn_idx: int, closing: bool) -> list[str]:
             queue = self.comment_queue
             if queue is None or closing or turn_idx < 1:
                 return []
