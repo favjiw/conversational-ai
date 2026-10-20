@@ -7,8 +7,8 @@ export interface StudioSpot {
   headY: number;
   /** -1 when the screen edge is to the left of the presenter, +1 to the right. */
   outerSide: -1 | 1;
-  /** Text on the wall sign of this half. */
-  sign: { text: string; color: string; glow: string };
+  /** Neon wall sign beside this presenter, or null for none. */
+  sign: { text: string; color: string; glow: string } | null;
 }
 
 const WALL_Z = -1.4;
@@ -87,9 +87,11 @@ export class StudioSet {
       }
     }
 
-    // Illuminated sign on the inner side, above head height
-    const signMat = this.glow(0xffffff, this.signTexture(spot.sign));
-    this.box(0.5, 0.16, 0.04, signMat, x - outerSide * 0.42, Math.min(headY + 0.45, 2.05), WALL_Z + 0.04);
+    // Neon sign on the inner side, just above head height (clear of the pinned banner)
+    if (spot.sign) {
+      const signMat = this.glow(0xffffff, this.signTexture(spot.sign));
+      this.box(0.5, 0.16, 0.04, signMat, x - outerSide * 0.42, headY + 0.25, WALL_Z + 0.04);
+    }
 
     // Desk: top, front panel and a glowing LED strip
     const deskTop = this.box(1.3, 0.05, 0.7, this.material({ color: 0x2a221e, roughness: 0.6 }), x, DESK_TOP_Y, 0.6);
@@ -136,7 +138,7 @@ export class StudioSet {
     this.group.add(mesh);
   }
 
-  private signTexture({ text, color, glow }: StudioSpot['sign']): THREE.CanvasTexture {
+  private signTexture({ text, color, glow }: NonNullable<StudioSpot['sign']>): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 164;

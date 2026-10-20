@@ -27,8 +27,6 @@ export interface DebugToolbarProps {
   onToggleCardMode: () => void;
   showSafeZones: boolean;
   onToggleSafeZones: () => void;
-  aspectRatio: '16:9' | 'full' | '9:16';
-  onToggleAspectRatio: () => void;
   onToggleDebugPanel: () => void;
 }
 
@@ -57,8 +55,6 @@ export const DebugToolbar: React.FC<DebugToolbarProps> = ({
   onToggleCardMode,
   showSafeZones,
   onToggleSafeZones,
-  aspectRatio,
-  onToggleAspectRatio,
   onToggleDebugPanel,
 }) => {
   const [lineText, setLineText] = useState('Halo sobat HITS, pagi ini kita ngobrolin ospek!');
@@ -209,13 +205,6 @@ export const DebugToolbar: React.FC<DebugToolbarProps> = ({
           onClick={onToggleSafeZones}
         >
           Zona Aman: {showSafeZones ? 'ON' : 'OFF'}
-        </button>
-
-        <button
-          className={`debug-btn ${aspectRatio === '16:9' ? 'active' : ''}`}
-          onClick={onToggleAspectRatio}
-        >
-          Rasio: {aspectRatio}
         </button>
 
         <button className="debug-btn" onClick={onToggleDebugPanel}>

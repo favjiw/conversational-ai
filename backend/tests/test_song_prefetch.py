@@ -154,7 +154,7 @@ class TestElevenLabsBreaker(unittest.IsolatedAsyncioTestCase):
             async def stream(self):
                 yield {"type": "audio", "data": await edge_audio()}
 
-        with patch("app.tts.provider.ElevenLabsTTSProvider.synthesize", failing), \
+        with patch("app.tts.provider.ElevenLabsTTSProvider.synthesize_with_timings", failing), \
              patch("edge_tts.Communicate", FakeCommunicate):
             self.assertEqual(await provider.synthesize("halo", "JBFqnCBsd6RMkjVDRZzb"), b"edge")
             self.assertEqual(await provider.synthesize("halo", "JBFqnCBsd6RMkjVDRZzb"), b"edge")

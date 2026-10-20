@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { FaceDriver } from '../face/FaceDriver';
 import { StudioSet, type StudioSpot } from './StudioSet';
 import { applyGlbRestPose, ROCKETBOX_BONES, type GlbBoneMap } from '../face/GlbRig';
+import { CANVAS_HEIGHT, CANVAS_WIDTH, DEFAULT_LAYOUT, type StageLayoutConfig } from '../layout/stageLayout';
 
 /** Which model to load for a presenter (from avatar.config.json "characters"). */
 export interface CharacterSpec {
@@ -20,8 +21,14 @@ export interface CharacterSpec {
   headBone?: string;
   /** GLB rig bone names for the rest pose and idle (defaults: Rocketbox Biped). */
   bones?: Partial<GlbBoneMap>;
-  /** How far below the head bone the camera aims (m); smaller = more headroom. */
-  framingDrop?: number;
+}
+
+/** Renderer look per character style (avatar.config.json styles.<id>.render). */
+export interface RenderStyle {
+  /** "aces" suits PBR skin; "none" keeps anime (MToon) colors flat and saturated. */
+  toneMapping?: 'aces' | 'neutral' | 'none';
+  /** Strength of the image-based lighting. */
+  environmentIntensity?: number;
 }
 
 export interface AvatarCharacter {
@@ -36,7 +43,6 @@ export interface AvatarCharacter {
   mixer: THREE.AnimationMixer | null;
   /** Rig bone names (GLB only). */
   bones: GlbBoneMap | null;
-  framingDrop: number;
   analyserNode: AnalyserNode | null;
   name: string;
   /** Head height in world units, measured once at load (rest pose). */
@@ -44,20 +50,17 @@ export interface AvatarCharacter {
 }
 
 /**
- * Split-screen framing: one camera per character, persona_a in the left
- * half and persona_b in the right half (top/bottom when the frame is portrait).
+ * Stacked 9:16 framing: one camera per presenter, each rendered into its own
+ * half of a fixed 1080x1920 canvas (see layout/stageLayout.ts). The two
+ * presenters stand side by side in the shared scene; render layers keep each
+ * camera to its own presenter plus the studio.
  */
-const SPLIT_ORDER = ['persona_a', 'persona_b'] as const;
-const SPLIT_FRAMING = {
-  fov: 30,
-  /** Camera distance in front of the character (m). */
-  distance: 2.3,
-  /** How far below the head the camera aims, so the shot is chest-up (m). */
-  targetDrop: 0.2,
-  /** Distance between the two characters in the shared scene (m). */
+const PERSONAS = ['persona_a', 'persona_b'] as const;
+const SCENE = {
+  /** Distance between the two presenters in the shared scene (m). */
   spacing: 1.6,
-  /** Inward turn so the two halves read as facing each other (rad). */
-  inwardYaw: Math.PI / 12,
+  /** Face centre above the head bone (the bone sits at the neck joint) (m). */
+  faceAboveHeadBone: 0.08,
   fallbackHeadY: 1.35,
 };
 const STUDIO_BACKGROUND = 0x151821;
@@ -71,7 +74,7 @@ const RIM_COLORS: Record<string, number> = {
 };
 
 /** Render layer of a presenter: each camera draws the studio (layer 0) plus its own presenter only. */
-const layerOf = (personaId: string) => SPLIT_ORDER.indexOf(personaId as (typeof SPLIT_ORDER)[number]) + 1;
+const layerOf = (personaId: string) => PERSONAS.indexOf(personaId as (typeof PERSONAS)[number]) + 1;
 
 export class SceneManager {
   scene: THREE.Scene;
@@ -82,12 +85,15 @@ export class SceneManager {
   private studio: StudioSet | null = null;
   private environment: THREE.Texture | null = null;
   private keyLight!: THREE.DirectionalLight;
+  private layout: StageLayoutConfig;
+  private renderScale = 1;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, layout: StageLayoutConfig = DEFAULT_LAYOUT, renderStyle: RenderStyle = {}) {
+    this.layout = layout;
     this.scene = new THREE.Scene();
     this.cameras = new Map(
-      SPLIT_ORDER.map((id) => {
-        const camera = new THREE.PerspectiveCamera(SPLIT_FRAMING.fov, 1, 0.1, 100);
+      PERSONAS.map((id) => {
+        const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
         camera.layers.enable(layerOf(id));
         return [id, camera];
       })
@@ -97,13 +103,18 @@ export class SceneManager {
       antialias: true,
       alpha: true
     });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
+    // Fixed broadcast resolution; CSS scales the canvas into the window (letterbox)
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT, false);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     // Filmic response keeps skin highlights from clipping on PBR characters
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMapping = {
+      aces: THREE.ACESFilmicToneMapping,
+      neutral: THREE.NeutralToneMapping,
+      none: THREE.NoToneMapping,
+    }[renderStyle.toneMapping ?? 'aces'];
     this.renderer.toneMappingExposure = 1.0;
 
     container.appendChild(this.renderer.domElement);
@@ -111,26 +122,21 @@ export class SceneManager {
     this.clock = new THREE.Clock();
     this.characters = new Map();
 
-    this.setupEnvironment();
+    this.setupEnvironment(renderStyle.environmentIntensity ?? 0.55);
     this.setupLights();
     this.scene.background = new THREE.Color(STUDIO_BACKGROUND);
-    this.updateLayout(container);
-
-    this.onWindowResize = () => this.updateLayout(container);
-    window.addEventListener('resize', this.onWindowResize);
+    this.updateLayout();
   }
 
-  private onWindowResize: () => void;
-
   /** Image-based lighting for PBR materials (skin, metal, fabric). */
-  private setupEnvironment() {
+  private setupEnvironment(intensity: number) {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const room = new RoomEnvironment();
     this.environment = pmrem.fromScene(room, 0.04).texture;
     room.dispose();
     pmrem.dispose();
     this.scene.environment = this.environment;
-    this.scene.environmentIntensity = 0.55;
+    this.scene.environmentIntensity = intensity;
   }
 
   setupLights() {
@@ -161,37 +167,62 @@ export class SceneManager {
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
   }
 
-  /** Whether the frame is split left/right (landscape) or top/bottom (portrait). */
-  private isPortrait(): boolean {
-    const size = this.renderer.getSize(new THREE.Vector2());
-    return size.x < size.y;
-  }
-
   private presenterX(personaId: string): number {
-    return (layerOf(personaId) === 1 ? -1 : 1) * SPLIT_FRAMING.spacing / 2;
+    return (layerOf(personaId) === 1 ? -1 : 1) * SCENE.spacing / 2;
   }
 
-  updateLayout(container?: HTMLElement) {
-    const parent = container || (this.renderer.domElement.parentElement as HTMLElement | null);
-    const width = parent?.clientWidth || window.innerWidth;
-    const height = parent?.clientHeight || window.innerHeight;
-    this.renderer.setSize(width, height);
+  private faceY(personaId: string): number {
+    return (this.characters.get(personaId)?.headY ?? SCENE.fallbackHeadY) + SCENE.faceAboveHeadBone;
+  }
 
-    const portrait = width < height;
-    const halfAspect = portrait ? width / (height / 2) : (width / 2) / height;
+  /** Panel index (0 = top, 1 = bottom) a presenter is shown in. */
+  panelOf(personaId: string): 0 | 1 {
+    return this.layout.panels[0].persona === personaId ? 0 : 1;
+  }
 
-    SPLIT_ORDER.forEach((personaId) => {
+  /** Replace the panel layout (order or framing) at runtime. */
+  setLayout(layout: StageLayoutConfig) {
+    this.layout = layout;
+    this.updateLayout();
+  }
+
+  /**
+   * Where a presenter's face appears on the canvas, as fractions (0 - 1).
+   * Used by the debug overlay to prove faces stay clear of the TikTok UI.
+   */
+  projectFace(personaId: string): { x: number; y: number } | null {
+    const char = this.characters.get(personaId);
+    if (!char) return null;
+    const camera = this.cameras.get(personaId)!;
+    const p = new THREE.Vector3(char.root.position.x, this.faceY(personaId), 0.1).project(camera);
+    const panel = this.panelOf(personaId);
+    return { x: (p.x + 1) / 2, y: panel * 0.5 + ((1 - p.y) / 2) * 0.5 };
+  }
+
+  /**
+   * Aim each panel camera so the presenter's face lands at its target height
+   * on the canvas (layout faceAt). Cameras stay level; the face position in
+   * the panel comes from shifting the camera height.
+   */
+  updateLayout() {
+    const panelAspect = CANVAS_WIDTH / (CANVAS_HEIGHT / 2);
+    this.layout.panels.forEach((framing, panel) => {
+      const personaId = framing.persona;
       const x = this.presenterX(personaId);
       const char = this.characters.get(personaId);
-      const headY = char?.headY ?? SPLIT_FRAMING.fallbackHeadY;
       if (char) char.root.position.x = x;
 
+      // Face position inside this panel (0 = panel top) -> NDC y
+      const inPanel = (framing.faceAt - panel * 0.5) / 0.5;
+      const ndcY = 1 - 2 * inPanel;
+      const halfHeight = framing.distance * Math.tan(THREE.MathUtils.degToRad(framing.fov / 2));
+      const cameraY = this.faceY(personaId) - ndcY * halfHeight;
+
       const camera = this.cameras.get(personaId)!;
-      const targetY = headY - (char?.framingDrop ?? SPLIT_FRAMING.targetDrop);
-      camera.fov = SPLIT_FRAMING.fov;
-      camera.aspect = halfAspect;
-      camera.position.set(x, targetY + 0.03, SPLIT_FRAMING.distance);
-      camera.lookAt(x, targetY, 0);
+      camera.fov = framing.fov;
+      camera.aspect = panelAspect;
+      camera.position.set(x, cameraY, framing.distance);
+      camera.lookAt(x, cameraY, 0);
       camera.updateProjectionMatrix();
     });
   }
@@ -202,12 +233,13 @@ export class SceneManager {
    */
   buildStudio() {
     this.studio?.dispose();
-    const spots: StudioSpot[] = SPLIT_ORDER.map((personaId) => ({
+    const spots: StudioSpot[] = PERSONAS.map((personaId) => ({
       personaId,
       x: this.presenterX(personaId),
-      headY: this.characters.get(personaId)?.headY ?? SPLIT_FRAMING.fallbackHeadY,
+      headY: this.characters.get(personaId)?.headY ?? SCENE.fallbackHeadY,
       outerSide: layerOf(personaId) === 1 ? -1 : 1,
-      sign: STUDIO_SIGNS[personaId],
+      // One sign, in the top panel: the bottom panel's top edge meets the program pill
+      sign: this.layout.panels[0].persona === personaId ? STUDIO_SIGNS.persona_a : null,
     }));
     this.studio = new StudioSet(spots);
     for (const spot of spots) {
@@ -242,10 +274,8 @@ export class SceneManager {
       : this.setupGlb(gltf, spec);
 
     const root = character.root;
+    // Stacked panels: both presenters face their own camera straight on
     root.position.set(this.presenterX(personaId), 0, 0);
-    // Turn characters slightly toward each other (across the split)
-    root.rotation.y += (root.position.x < 0 ? 1 : -1) * SPLIT_FRAMING.inwardYaw;
-    if (spec.framingDrop !== undefined) character.framingDrop = spec.framingDrop;
 
     // GLB rigs come in a T/A-pose: put the arms down with hands on the desk
     if (character.bones && !character.mixer && !applyGlbRestPose(root, character.bones)) {
@@ -282,11 +312,11 @@ export class SceneManager {
     const headNode = vrm.humanoid?.getNormalizedBoneNode('head');
     const headY = headNode
       ? headNode.getWorldPosition(new THREE.Vector3()).y
-      : SPLIT_FRAMING.fallbackHeadY;
+      : SCENE.fallbackHeadY;
 
     return {
       kind: 'vrm', root: vrm.scene, vrm, face: null, mixer: null, bones: null,
-      framingDrop: SPLIT_FRAMING.targetDrop, analyserNode: null, name: spec.name, headY,
+      analyserNode: null, name: spec.name, headY,
     };
   }
 
@@ -329,7 +359,7 @@ export class SceneManager {
     return {
       kind: 'glb', root, vrm: null, face: face.hasArkit ? face : null, mixer,
       bones: { ...ROCKETBOX_BONES, ...spec.bones },
-      framingDrop: SPLIT_FRAMING.targetDrop, analyserNode: null, name: spec.name,
+      analyserNode: null, name: spec.name,
       headY: this.findHeadY(root, spec),
     };
   }
@@ -345,7 +375,7 @@ export class SceneManager {
     }
     if (head) return head.getWorldPosition(new THREE.Vector3()).y;
     const box = new THREE.Box3().setFromObject(root);
-    return Number.isFinite(box.max.y) ? box.max.y - 0.12 : SPLIT_FRAMING.fallbackHeadY;
+    return Number.isFinite(box.max.y) ? box.max.y - 0.12 : SCENE.fallbackHeadY;
   }
 
   update(deltaTime?: number) {
@@ -357,49 +387,29 @@ export class SceneManager {
   }
 
   render() {
-    const size = this.renderer.getSize(new THREE.Vector2());
-    const portrait = this.isPortrait();
-    const halfW = portrait ? size.x : Math.floor(size.x / 2);
-    const halfH = portrait ? Math.floor(size.y / 2) : size.y;
-
+    const w = CANVAS_WIDTH * this.renderScale;
+    const half = Math.floor((CANVAS_HEIGHT * this.renderScale) / 2);
     this.renderer.setScissorTest(true);
-    SPLIT_ORDER.forEach((personaId, i) => {
-      // WebGL viewport origin is bottom-left: first half is left, or top in portrait.
-      const x = portrait ? 0 : i * halfW;
-      const y = portrait ? (i === 0 ? size.y - halfH : 0) : 0;
-      const w = portrait ? size.x : (i === 0 ? halfW : size.x - halfW);
-      const h = portrait ? (i === 0 ? halfH : size.y - halfH) : size.y;
-      this.renderer.setViewport(x, y, w, h);
-      this.renderer.setScissor(x, y, w, h);
-      this.renderer.render(this.scene, this.cameras.get(personaId)!);
+    this.layout.panels.forEach((framing, panel) => {
+      // WebGL viewport origin is bottom-left: panel 0 (top) sits at y = half
+      const y = panel === 0 ? half : 0;
+      this.renderer.setViewport(0, y, w, half);
+      this.renderer.setScissor(0, y, w, half);
+      this.renderer.render(this.scene, this.cameras.get(framing.persona)!);
     });
     this.renderer.setScissorTest(false);
   }
 
-  onResize(container: HTMLElement) {
-    this.updateLayout(container);
-  }
-
+  /** Quality presets scale the internal resolution (CSS keeps the display size) and toggle shadows. */
   setQuality(quality: 'low' | 'medium' | 'high') {
-    switch (quality) {
-      case 'low':
-        this.renderer.setPixelRatio(0.75);
-        this.renderer.shadowMap.enabled = false;
-        break;
-      case 'medium':
-        this.renderer.setPixelRatio(1);
-        this.renderer.shadowMap.enabled = true;
-        break;
-      case 'high':
-        this.renderer.setPixelRatio(window.devicePixelRatio);
-        this.renderer.shadowMap.enabled = true;
-        break;
-    }
+    this.renderScale = quality === 'low' ? 0.75 : 1;
+    this.renderer.setPixelRatio(this.renderScale);
+    this.renderer.setSize(CANVAS_WIDTH, CANVAS_HEIGHT, false);
+    this.renderer.shadowMap.enabled = quality !== 'low';
     this.keyLight.castShadow = this.renderer.shadowMap.enabled;
   }
 
   dispose() {
-    window.removeEventListener('resize', this.onWindowResize);
     this.renderer.domElement.remove();
     this.studio?.dispose();
     this.environment?.dispose();

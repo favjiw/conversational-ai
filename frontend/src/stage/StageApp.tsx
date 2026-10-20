@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Stats from 'stats.js';
-import { SceneManager, type CharacterSpec } from './scene/SceneManager';
+import { SceneManager, type CharacterSpec, type RenderStyle } from './scene/SceneManager';
+import { applyVrmVisemes } from './lipsync/VrmVisemes';
 import { GlbFaceAnimator } from './face/GlbFaceAnimator';
 import { GlbBodyIdle } from './face/GlbRig';
 import { VisemeLipSync, DEFAULT_VISEME_CONFIG, type VisemeLipSyncConfig } from './lipsync/VisemeLipSync';
@@ -10,8 +11,10 @@ import { ExpressionDriver, type EmotionType, type ExpressionConfig } from './exp
 import { IdleManager, type IdleConfig } from './idle/IdleManager';
 import { ScenarioPlayer, type ScenarioData, type ScenarioTurn, type PlayerState } from './scenario/ScenarioPlayer';
 import { DebugPanel, type DebugConfig } from './debug/DebugPanel';
-import { StageBroadcastHUD } from './components/StageBroadcastHUD';
+import { PortraitHUD, type InfoCard, type ProgramInfo } from './components/PortraitHUD';
 import { DebugToolbar } from './components/DebugToolbar';
+import { SafeZoneOverlay, type FaceMarker } from './components/SafeZoneOverlay';
+import { resolveLayout, type PanelFraming } from './layout/stageLayout';
 import { LiveBroadcastAdapter, type LiveSlotData } from './live/LiveBroadcastAdapter';
 import './StageApp.css';
 
@@ -21,19 +24,64 @@ const SCENARIOS = [
   { id: 'stabilitas-panjang-01', label: '3. Uji Stabilitas Panjang', path: '/scenarios/scenario_stability.json' },
 ];
 
-/** Presenter models used when avatar.config.json has no "characters" entry. */
-const DEFAULT_CHARACTERS: Record<'persona_a' | 'persona_b', CharacterSpec> = {
-  persona_a: { name: 'Raka', kind: 'vrm', url: '/models/red-male.vrm' },
-  persona_b: { name: 'Salsa', kind: 'vrm', url: '/models/female.vrm' },
+type PersonaId = 'persona_a' | 'persona_b';
+
+/** One look for both presenters: same art style for the pair. */
+interface CharacterStyle {
+  label?: string;
+  characters?: Partial<Record<PersonaId, Partial<CharacterSpec>>>;
+  render?: RenderStyle;
+}
+
+/** Built-in styles, used when avatar.config.json does not override them. */
+const DEFAULT_STYLES: Record<string, CharacterStyle> = {
+  realistic: {
+    label: '3D Realistis',
+    characters: {
+      persona_a: { name: 'Raka', kind: 'glb', url: '/models/realistic/raka.glb' },
+      persona_b: { name: 'Salsa', kind: 'glb', url: '/models/realistic/salsa.glb' },
+    },
+    render: { toneMapping: 'aces' },
+  },
+  animation: {
+    label: 'Animasi (VTuber)',
+    characters: {
+      persona_a: { name: 'Raka', kind: 'vrm', url: '/models/red-male.vrm' },
+      persona_b: { name: 'Salsa', kind: 'vrm', url: '/models/female.vrm' },
+    },
+    render: { toneMapping: 'none' },
+  },
 };
 
+/** Routes that pin a style; plain /stage uses ?style= or the config default. */
+const STYLE_ROUTES: Record<string, string> = {
+  '/stage-3d-realistic': 'realistic',
+  '/stage-animation': 'animation',
+};
+
+function resolveStyleId(config: AvatarConfigFile): string {
+  const path = window.location.pathname.replace(/\/+$/, '');
+  return STYLE_ROUTES[path]
+    ?? new URLSearchParams(window.location.search).get('style')
+    ?? config.defaultStyle
+    ?? 'realistic';
+}
+
 interface AvatarConfigFile {
-  characters?: Partial<Record<'persona_a' | 'persona_b', CharacterSpec>>;
+  /** Selectable character styles; each style sets both presenters. */
+  styles?: Record<string, CharacterStyle>;
+  defaultStyle?: string;
+  /** Legacy single-style config (used when no style is defined). */
+  characters?: Partial<Record<PersonaId, CharacterSpec>>;
   lipsync?: Partial<LipSyncConfig>;
   expression?: Partial<ExpressionConfig>;
   idle?: Partial<IdleConfig>;
   glbFace?: { jawScale?: number };
   viseme?: Partial<VisemeLipSyncConfig>;
+  /** Program overlay: title, station, pinned bait question. */
+  program?: Partial<ProgramInfo>;
+  /** Panel order and framing: panels[0] = top, panels[1] = bottom. */
+  layout?: { panels?: Partial<PanelFraming>[] };
 }
 
 /** avatar.config.json is optional: a missing or broken file falls back to defaults. */
@@ -71,25 +119,25 @@ export function StageApp() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check ?mode=debug parameter
-  const [isDebug] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('mode') === 'debug';
-  });
+  // ?clean=1: capture-ready output for TikTok LIVE Studio (no debug UI, no banners)
+  const [isClean] = useState<boolean>(() => new URLSearchParams(window.location.search).get('clean') === '1');
+  // ?mode=debug: avatar lab (toolbar, lil-gui, FPS); ignored when clean
+  const [isDebug] = useState<boolean>(() =>
+    !isClean && new URLSearchParams(window.location.search).get('mode') === 'debug');
 
-  // Stage Layout & Visual Controls (Phase 2 FR-9)
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | 'full' | '9:16'>(() => {
-    if (typeof window === 'undefined') return '16:9';
-    const param = new URLSearchParams(window.location.search).get('aspect');
-    if (param === '9:16' || param === 'full' || param === '16:9') return param;
-    return '16:9';
-  });
+  // Safe-zone overlay: on in debug, or with ?zones=1
   const [showSafeZones, setShowSafeZones] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
-    if (params.has('safezones')) return params.get('safezones') === 'true';
+    if (params.get('clean') === '1') return false;
+    if (params.has('zones')) return params.get('zones') === '1';
     return params.get('mode') === 'debug';
   });
+  const [faceMarkers, setFaceMarkers] = useState<FaceMarker[]>([]);
+  const [program, setProgram] = useState<ProgramInfo>({ title: 'PAGI BENER', station: '103.9 HITS' });
+  const [panelOrder, setPanelOrder] = useState<['persona_a' | 'persona_b', 'persona_a' | 'persona_b']>(['persona_a', 'persona_b']);
+  const [topic, setTopic] = useState<string | null>(null);
+  const [characterNames, setCharacterNames] = useState<Record<string, string>>({ persona_a: 'Raka', persona_b: 'Salsa' });
+  const frameRef = useRef<HTMLDivElement>(null);
   const [displayCardMode, setDisplayCardMode] = useState<'auto' | 'talk' | 'song'>('auto');
   const [activeSpeaker, setActiveSpeaker] = useState<'persona_a' | 'persona_b' | null>(null);
   const [currentTime, setCurrentTime] = useState<string>(formatWibTime);
@@ -105,7 +153,7 @@ export function StageApp() {
   const [currentSlot, setCurrentSlot] = useState<LiveSlotData | null>(null);
 
   const [selectedScenarioId, setSelectedScenarioId] = useState(SCENARIOS[0].id);
-  const [currentTurn, setCurrentTurn] = useState<ScenarioTurn | null>(null);
+  const [, setCurrentTurn] = useState<ScenarioTurn | null>(null);
   const [turnIndex, setTurnIndex] = useState(0);
   const [playerState, setPlayerState] = useState<PlayerState>('idle');
   const [musicTrack, setMusicTrack] = useState<MusicTrackData | null>(null);
@@ -161,15 +209,28 @@ export function StageApp() {
           statsRef.current = stats;
         }
 
-        const sceneManager = new SceneManager(containerRef.current!);
+        const avatarConfig = await loadAvatarConfig();
+        if (!mounted) return;
+        const styleId = resolveStyleId(avatarConfig);
+        const style: CharacterStyle = {
+          ...DEFAULT_STYLES[styleId],
+          ...avatarConfig.styles?.[styleId],
+        };
+        if (!DEFAULT_STYLES[styleId] && !avatarConfig.styles?.[styleId]) {
+          console.warn(`[Stage] Unknown style "${styleId}", using realistic`);
+          Object.assign(style, DEFAULT_STYLES.realistic);
+        }
+        console.log(`[Stage] Character style: ${styleId} (${style.label ?? styleId})`);
+        const layout = resolveLayout(avatarConfig.layout);
+        setProgram((prev) => ({ ...prev, ...avatarConfig.program }));
+        setPanelOrder([layout.panels[0].persona, layout.panels[1].persona]);
+        const sceneManager = new SceneManager(containerRef.current!, layout, style.render);
         sceneManagerRef.current = sceneManager;
 
         const audioManager = new AudioManager();
         audioManagerRef.current = audioManager;
         // Debug only: lets devtools read live blendshape values while tuning.
         if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current };
-
-        const avatarConfig = await loadAvatarConfig();
 
         audioManager.onSpeakingChange = (personaId) => {
           if (mounted) setActiveSpeaker((personaId as any) || null);
@@ -228,10 +289,11 @@ export function StageApp() {
         };
         await Promise.all((['persona_a', 'persona_b'] as const).map((personaId) =>
           sceneManager.loadCharacter(personaId, {
-            ...DEFAULT_CHARACTERS[personaId],
-            ...avatarConfig.characters?.[personaId],
+            ...DEFAULT_STYLES.realistic.characters![personaId],
+            ...(avatarConfig.styles ? {} : avatarConfig.characters?.[personaId]),
+            ...style.characters?.[personaId],
             ...urlOverride(personaId),
-          })
+          } as CharacterSpec)
         ));
         // The driver maps are shared refs: a stale mount must not write into them.
         if (!mounted) {
@@ -241,12 +303,18 @@ export function StageApp() {
         }
 
         sceneManager.buildStudio();
+        setCharacterNames({
+          persona_a: sceneManager.characters.get('persona_a')?.name ?? 'Raka',
+          persona_b: sceneManager.characters.get('persona_b')?.name ?? 'Salsa',
+        });
 
         ['persona_a', 'persona_b'].forEach(personaId => {
           const char = sceneManager.characters.get(personaId);
           if (!char) return;
           char.analyserNode = audioManager.createAnalyser(personaId);
           lipSyncManagersRef.current.set(personaId, new LipSyncLevel1(debugConfig.lipsync));
+          // Viseme lip-sync for both styles (GLB viseme shapes or VRM vowels)
+          visemeLipSyncsRef.current.set(personaId, new VisemeLipSync(debugConfig.viseme));
 
           if (char.bones && !char.mixer) {
             glbBodyIdlesRef.current.set(personaId, new GlbBodyIdle(char.root, char.bones, debugConfig.idle));
@@ -261,7 +329,6 @@ export function StageApp() {
               speakingEmotionScale: debugConfig.expression.speakingEmotionScale,
             // The partner sits on persona_a's left (+1) and on persona_b's right (-1)
             }, personaId === 'persona_a' ? 1 : -1));
-            visemeLipSyncsRef.current.set(personaId, new VisemeLipSync(debugConfig.viseme));
             debugPanelRef.current?.addFaceSliders(char.name, char.face);
           }
 
@@ -305,6 +372,7 @@ export function StageApp() {
         player.onTurnChange = (turn, idx) => {
           // Scenario clips carry no word timings: visemes are estimated from the text
           visemeLipSyncsRef.current.get(turn.persona)?.setLine(turn.text, null);
+          if (turn.pinned !== undefined && mounted) setProgram((prev) => ({ ...prev, pinnedQuestion: turn.pinned }));
           glbFaceAnimatorsRef.current.get(turn.persona)?.setEmotion(turn.emotion);
           if (mounted) {
             setCurrentTurn(turn);
@@ -352,6 +420,10 @@ export function StageApp() {
 
         liveAdapter.onSlotChange = (slot) => {
           if (mounted) setCurrentSlot(slot);
+        };
+
+        liveAdapter.onTopicChange = (t) => {
+          if (mounted) setTopic(t);
         };
 
         liveAdapter.onTurnChange = (turn) => {
@@ -435,9 +507,14 @@ export function StageApp() {
         const im = idleManagersRef.current.get(personaId);
         const audioLevel = audioManager.getLevel(personaId);
 
-        if (ls) ls.update(char.vrm, audioLevel, deltaTimeMs);
+        // Visemes drive the mouth while a spoken line is known; amplitude otherwise
+        const vls = visemeLipSyncsRef.current.get(personaId);
+        const useVisemes = Boolean(vls?.hasLine) && lipSyncMethodRef.current === 'viseme';
+        if (ls) ls.update(useVisemes ? null : char.vrm, audioLevel, deltaTimeMs);
         const mouthOpen = ls ? ls.getMouthOpen() : 0;
+        const visemes = vls ? vls.update(deltaTime, audioManager.getPlayback(personaId), mouthOpen) : null;
         if (char.vrm) {
+          applyVrmVisemes(char.vrm, useVisemes ? visemes : null);
           if (ed) ed.update(deltaTime, mouthOpen);
           if (im) im.update(deltaTime);
         }
@@ -445,9 +522,6 @@ export function StageApp() {
         const listening = speaker !== null && speaker !== personaId;
         const faceAnimator = glbFaceAnimatorsRef.current.get(personaId);
         if (faceAnimator) {
-          const vls = visemeLipSyncsRef.current.get(personaId);
-          const visemes = vls ? vls.update(deltaTime, audioManager.getPlayback(personaId), mouthOpen) : null;
-          const useVisemes = vls?.hasLine && lipSyncMethodRef.current === 'viseme';
           faceAnimator.isListening = listening;
           // Without a line (e.g. a bare test clip) fall back to amplitude jaw motion
           faceAnimator.update(deltaTime, mouthOpen, useVisemes ? visemes : null);
@@ -496,6 +570,46 @@ export function StageApp() {
   const activeMusicTrack = musicTrack || (isDebug && displayCardMode === 'song' ? DEFAULT_DEMO_TRACK : null);
   const isSongMode = displayCardMode === 'song' || (displayCardMode === 'auto' && Boolean(musicTrack));
   const activeScenario = scenariosData.get(selectedScenarioId);
+
+  // Right-column card: song while music plays, the talk topic, or the cue on air
+  const slotType = currentSlot?.slot_type;
+  const infoCard: InfoCard = isSongMode && activeMusicTrack
+    ? { kind: 'song', title: activeMusicTrack.title, artist: activeMusicTrack.artist, badge: activeMusicTrack.badge, progress: songProgress }
+    : slotType === 'song'
+      // Song slot before the music starts: the presenters are introducing it
+      ? { kind: 'talk', label: currentSlot?.label || 'Lagu', badge: 'LAGU BERIKUTNYA' }
+    : slotType && slotType !== 'talk' && slotType !== 'ice_breaking' && slotType !== 'time_marker'
+      ? { kind: 'cue', label: currentSlot?.label || slotType }
+      : currentSlot?.label || topic
+        ? { kind: 'talk', label: currentSlot?.label || 'Talk', topic: topic ?? undefined }
+        : null;
+
+  // Face markers for the safe-zone overlay (cheap: two projections, 4x per second)
+  useEffect(() => {
+    if (!showSafeZones) return;
+    const timer = setInterval(() => {
+      const sm = sceneManagerRef.current;
+      if (!sm) return;
+      const markers: FaceMarker[] = [];
+      sm.characters.forEach((char, personaId) => {
+        const p = sm.projectFace(personaId);
+        if (p) markers.push({ name: char.name, ...p });
+      });
+      setFaceMarkers(markers);
+    }, 250);
+    return () => clearInterval(timer);
+  }, [showSafeZones]);
+
+  // Expose the canvas scale (frame width / 1080) so HUD sizes follow the letterboxed frame
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const apply = () => frame.style.setProperty('--u', String(frame.clientWidth / 1080));
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(frame);
+    return () => ro.disconnect();
+  }, []);
 
   const handleUserInteraction = async () => {
     // Inside the click: start anything autoplay policy held back.
@@ -575,44 +689,27 @@ export function StageApp() {
     }
   };
 
-  const handleToggleAspectRatio = () => {
-    const next = aspectRatio === '16:9' ? 'full' : aspectRatio === 'full' ? '9:16' : '16:9';
-    setAspectRatio(next);
-    setTimeout(() => {
-      if (containerRef.current && sceneManagerRef.current) {
-        sceneManagerRef.current.updateLayout(containerRef.current);
-      }
-    }, 60);
-  };
-
   return (
-    <div className="stage-app" onClick={handleUserInteraction}>
-      <div
-        className={`stage-frame ${
-          aspectRatio === '16:9'
-            ? 'aspect-16-9'
-            : aspectRatio === '9:16'
-            ? 'aspect-9-16'
-            : 'aspect-full'
-        }`}
-      >
+    <div className={`stage-app ${isClean ? 'clean' : ''}`} onClick={handleUserInteraction}>
+      <div ref={frameRef} className="stage-frame aspect-9-16">
         <div ref={containerRef} className="canvas-container" />
 
         {/* Stage Broadcast HUD (Light Mode Studio Matching Operator Panel) */}
-        <StageBroadcastHUD
-          showSafeZones={showSafeZones}
-          programTitle="PAGI BENER"
-          stationName="103.9 HITS Unikom Radio"
+        <PortraitHUD
+          program={program}
           currentTime={currentTime}
+          panels={[
+            { persona: panelOrder[0], name: characterNames[panelOrder[0]], role: panelOrder[0] === 'persona_a' ? 'Penyiar 1' : 'Penyiar 2' },
+            { persona: panelOrder[1], name: characterNames[panelOrder[1]], role: panelOrder[1] === 'persona_a' ? 'Penyiar 1' : 'Penyiar 2' },
+          ]}
           activeSpeaker={activeSpeaker}
-          isSongMode={isSongMode}
-          musicTrack={activeMusicTrack}
-          songProgress={songProgress}
-          currentTurn={currentTurn}
+          info={infoCard}
         />
 
+        {showSafeZones && !loading && <SafeZoneOverlay faces={faceMarkers} />}
+
         {/* Non-blocking Audio Unlock Banner */}
-        {!audioUnlocked && !loading && (
+        {!audioUnlocked && !loading && !isClean && (
           <div className="audio-unlock-banner">
             <span className="audio-icon">🔊</span>
             <span>Klik di mana saja untuk mengaktifkan audio siaran</span>
@@ -624,7 +721,7 @@ export function StageApp() {
           <div className="overlay">
             <div className="loading">
               <div className="spinner"></div>
-              <p>Memuat model VRM & studio avatar...</p>
+              <p>Memuat karakter & studio avatar...</p>
             </div>
           </div>
         )}
@@ -637,7 +734,7 @@ export function StageApp() {
               <p>{error}</p>
               <div className="hint">
                 <strong>Solusi:</strong>
-                <p>Pastikan file model VRM berada di folder <code>public/models/</code>.</p>
+                <p>Pastikan file model (GLB/VRM) berada di folder <code>public/models/</code>.</p>
               </div>
             </div>
           </div>
@@ -677,8 +774,6 @@ export function StageApp() {
           onToggleCardMode={() => setDisplayCardMode(prev => (prev === 'song' ? 'talk' : 'song'))}
           showSafeZones={showSafeZones}
           onToggleSafeZones={() => setShowSafeZones(prev => !prev)}
-          aspectRatio={aspectRatio}
-          onToggleAspectRatio={handleToggleAspectRatio}
           onToggleDebugPanel={() => debugPanelRef.current?.toggle()}
         />
       )}

@@ -29,24 +29,16 @@
   transition: all 0.25s ease;
 }
 
-.stage-app .stage-frame.aspect-16-9 {
-  aspect-ratio: 16 / 9;
-  width: min(100vw, calc(100vh * 16 / 9));
-  height: auto;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
-}
-
-.stage-app .stage-frame.aspect-full {
-  width: 100vw;
-  height: 100vh;
-}
-
+/* Portrait 9:16 broadcast frame: fixed 1080x1920 canvas scaled to fit (letterbox) */
 .stage-app .stage-frame.aspect-9-16 {
   aspect-ratio: 9 / 16;
-  height: 100vh;
-  max-width: calc(100vh * 9 / 16);
-  width: 100%;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+  width: min(100vw, calc(100vh * 9 / 16));
+  height: auto;
+  --u: 0.5; /* frame width / 1080, set from StageApp */
+}
+
+.stage-app.clean {
+  background: #000;
 }
 
 /* Three.js Canvas Container */
@@ -64,271 +56,136 @@
   height: 100% !important;
 }
 
-/* HUD Overlay Layer: split screen (left Penyiar 1, right Penyiar 2) */
-.stage-app .stage-hud {
+/* Portrait HUD: positions are fractions of the 1080x1920 canvas, sizes scale with --u */
+.stage-app .portrait-hud {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 10;
   --accent-a: #10b981;
-  --accent-b: #ef4444;
-  --hud-pad: clamp(12px, 2.2vw, 40px);
-  --hud-surface: rgba(255, 255, 255, 0.9);
-  --hud-text: #111827;
-  --hud-muted: #6b7280;
+  --accent-b: #f472b6;
+  --surface: rgba(10, 12, 20, 0.72);
+  font-size: calc(30px * var(--u));
+  color: #f8fafc;
 }
 
-/* Safe Zone Guides (debug only) */
-.stage-app .safe-zone {
+.stage-app .ph-panel {
   position: absolute;
   left: 0;
   right: 0;
-  height: 12%;
-  border: 1px dashed rgba(239, 68, 68, 0.6);
-  background: rgba(239, 68, 68, 0.05);
-  font-size: 11px;
-  color: #ef4444;
-  padding: 4px 8px;
-}
-
-.stage-app .safe-zone-top { top: 0; }
-.stage-app .safe-zone-bottom { bottom: 0; }
-
-/* Halves mirror the two 3D viewports */
-.stage-app .split-half {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 50%;
+  height: 50%;
   transition: box-shadow 0.25s ease;
 }
+.stage-app .ph-panel.top { top: 0; }
+.stage-app .ph-panel.bottom { bottom: 0; }
+.stage-app .ph-panel.persona_a { --accent: var(--accent-a); }
+.stage-app .ph-panel.persona_b { --accent: var(--accent-b); }
 
-.stage-app .split-left { left: 0; }
-.stage-app .split-right { right: 0; }
-
-.stage-app .split-half.persona_a { --accent: var(--accent-a); }
-.stage-app .split-half.persona_b { --accent: var(--accent-b); }
-
-.stage-app .split-half.active {
-  box-shadow: inset 0 0 0 4px var(--accent);
+/* Speaking marker: thin accent frame on the panel */
+.stage-app .ph-panel.speaking {
+  box-shadow: inset 0 0 0 calc(6px * var(--u)) var(--accent);
 }
 
-.stage-app .split-divider {
+/* Name tag on the right, next to the divider (clear of header and comments) */
+.stage-app .ph-name {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  transform: translateX(-50%);
-  background: rgba(17, 24, 39, 0.12);
-}
-
-/* Name tag in the bottom outer corner of each half */
-.stage-app .name-tag {
-  position: absolute;
-  bottom: var(--hud-pad);
+  right: 6%;
   display: flex;
-  align-items: baseline;
-  gap: 0.5em;
-  padding: 0.45em 0.9em;
-  border-radius: 10px;
-  background: var(--hud-surface);
-  color: var(--hud-text);
-  font-size: clamp(12px, 1.15vw, 22px);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.35em 0.8em;
+  border-radius: 0.6em;
+  background: var(--surface);
+  font-size: 0.9em;
 }
-
-.stage-app .split-left .name-tag { left: var(--hud-pad); }
-.stage-app .split-right .name-tag { right: var(--hud-pad); }
-
-.stage-app .name-tag-dot {
+.stage-app .ph-panel.top .ph-name { bottom: calc(70px * var(--u)); }
+.stage-app .ph-panel.bottom .ph-name { top: calc(70px * var(--u)); }
+.stage-app .ph-dot {
   width: 0.55em;
   height: 0.55em;
   border-radius: 50%;
-  align-self: center;
-  background: #d1d5db;
+  background: #64748b;
 }
-
-.stage-app .split-half.active .name-tag-dot {
+.stage-app .ph-panel.speaking .ph-dot {
   background: var(--accent);
   animation: stage-pulse 1.2s ease-in-out infinite;
 }
+.stage-app .ph-name-text { font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.stage-app .ph-role { opacity: 0.7; font-size: 0.8em; }
 
-.stage-app .name-tag-name {
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.stage-app .name-tag-role {
-  color: var(--hud-muted);
-  font-size: 0.8em;
-}
-
-/* Program + time header */
-.stage-app .stage-header {
+/* Program pill centred on the panel divider */
+.stage-app .ph-program {
   position: absolute;
-  top: var(--hud-pad);
-  left: var(--hud-pad);
-  right: var(--hud-pad);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  font-size: clamp(12px, 1.1vw, 21px);
-}
-
-.stage-app .program,
-.stage-app .time-pill {
-  background: var(--hud-surface);
-  border-radius: 10px;
-  padding: 0.4em 0.85em;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-}
-
-.stage-app .program {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6em;
-}
-
-.stage-app .program-title {
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: var(--hud-text);
-}
-
-.stage-app .program-station {
-  color: #d97706;
-  font-weight: 600;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.4em 0.9em;
+  border-radius: 999px;
+  background: rgba(10, 12, 20, 0.85);
+  border: calc(2px * var(--u)) solid rgba(245, 158, 11, 0.8);
+  white-space: nowrap;
   font-size: 0.85em;
 }
-
-.stage-app .time-pill {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--hud-text);
+.stage-app .ph-ai {
+  background: #f59e0b;
+  color: #111827;
+  font-weight: 900;
+  padding: 0.05em 0.45em;
+  border-radius: 0.35em;
 }
+.stage-app .ph-title { font-weight: 900; letter-spacing: 0.05em; }
+.stage-app .ph-station { color: #fbbf24; font-weight: 700; }
+.stage-app .ph-time { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.stage-app .ph-sep { width: 1px; height: 1em; background: rgba(255, 255, 255, 0.35); }
 
-/* One bottom card: subtitle while talking, now playing during songs */
-.stage-app .bottom-card {
+/* Pinned bait question just below the TikTok header zone */
+.stage-app .ph-pinned {
   position: absolute;
-  bottom: var(--hud-pad);
+  top: 10.8%;
   left: 50%;
   transform: translateX(-50%);
-  width: min(56%, 1000px);
-  background: var(--hud-surface);
-  border-radius: 14px;
-  padding: 0.8em 1.2em;
-  color: var(--hud-text);
-  font-size: clamp(13px, 1.3vw, 26px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-}
-
-.stage-app .subtitle-card { border-top: 3px solid transparent; }
-.stage-app .subtitle-card.persona_a { border-top-color: var(--accent-a); }
-.stage-app .subtitle-card.persona_b { border-top-color: var(--accent-b); }
-
-.stage-app .subtitle-name {
-  display: block;
-  font-size: 0.75em;
+  width: max-content;
+  max-width: 86%;
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 0.9em;
+  border-radius: 0.7em;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.2em;
+  font-size: 0.9em;
+  text-align: center;
+  box-shadow: 0 calc(4px * var(--u)) calc(16px * var(--u)) rgba(0, 0, 0, 0.3);
 }
+.stage-app .ph-pin { font-size: 0.9em; }
 
-.stage-app .subtitle-card.persona_a .subtitle-name { color: var(--accent-a); }
-.stage-app .subtitle-card.persona_b .subtitle-name { color: var(--accent-b); }
-
-.stage-app .subtitle-text {
-  margin: 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+/* Dynamic info in the bottom panel's right column (x 71-95%, from y 66%) */
+.stage-app .ph-info {
+  position: absolute;
+  left: 71%;
+  right: 5%;
+  top: 66%;
+  max-height: 24%;
   overflow: hidden;
-}
-
-.stage-app .song-card {
-  display: flex;
-  align-items: center;
-  gap: 0.9em;
-  width: min(40%, 720px);
-}
-
-.stage-app .song-icon {
-  flex: none;
-  width: 2.4em;
-  height: 2.4em;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f97316, #f59e0b);
-  color: #fff;
-  font-size: 1.2em;
-}
-
-.stage-app .song-details {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 0.25em;
+  padding: 0.6em 0.7em;
+  border-radius: 0.7em;
+  background: var(--surface);
+  border-left: calc(5px * var(--u)) solid #f59e0b;
+  font-size: 0.75em;
 }
-
-.stage-app .song-badge {
-  font-size: 0.65em;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: #d97706;
-}
-
-.stage-app .song-title {
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stage-app .song-artist {
-  font-size: 0.8em;
-  color: var(--hud-muted);
-}
-
-.stage-app .song-progress {
-  margin-top: 0.4em;
-  height: 4px;
-  border-radius: 2px;
-  background: #e5e7eb;
-  overflow: hidden;
-}
-
-.stage-app .song-progress-fill {
-  height: 100%;
-  background: #f59e0b;
-  transition: width 0.5s linear;
-}
-
-/* Portrait (debug 9:16): halves stack top/bottom like the 3D viewports */
-.stage-app .stage-frame.aspect-9-16 .split-half {
-  width: 100%;
-  height: 50%;
-}
-
-.stage-app .stage-frame.aspect-9-16 .split-left { top: 0; bottom: auto; }
-.stage-app .stage-frame.aspect-9-16 .split-right { top: auto; bottom: 0; left: 0; }
-.stage-app .stage-frame.aspect-9-16 .split-right .name-tag { right: auto; left: var(--hud-pad); }
-
-.stage-app .stage-frame.aspect-9-16 .split-divider {
-  top: 50%;
-  bottom: auto;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  transform: translateY(-50%);
-}
-
-.stage-app .stage-frame.aspect-9-16 .bottom-card { width: 90%; }
+.stage-app .ph-info.talk { border-left-color: var(--accent-a); }
+.stage-app .ph-info-badge { font-size: 0.7em; font-weight: 800; letter-spacing: 0.08em; color: #fbbf24; }
+.stage-app .ph-info-title { font-weight: 800; line-height: 1.25; }
+.stage-app .ph-info-sub { opacity: 0.75; font-size: 0.85em; }
+.stage-app .ph-progress { height: calc(6px * var(--u)); border-radius: 3px; background: rgba(255, 255, 255, 0.2); overflow: hidden; margin-top: 0.3em; }
+.stage-app .ph-progress > div { height: 100%; background: #f59e0b; transition: width 0.5s linear; }
 
 /* Non-blocking Audio Unlock Banner */
 .stage-app .audio-unlock-banner {
@@ -421,10 +278,12 @@
 
 /* Debug Floating Toolbar (Light Mode matching Operator Panel) */
 .stage-app .debug-toolbar {
+  /* Beside the 9:16 frame, not over it */
   position: fixed;
-  bottom: 1.25rem;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 1rem;
+  left: 1rem;
+  max-width: min(440px, calc((100vw - 100vh * 9 / 16) / 2 - 2rem));
+  min-width: 260px;
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid #e5e7eb;
   border-radius: 16px;
@@ -441,6 +300,7 @@
 }
 
 .stage-app .debug-controls-row {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -567,6 +427,73 @@
 .stage-app .debug-text-input {
   flex: 1;
   min-width: 260px;
+}
+
+/* Safe-zone debug overlay (fractions of the 1080x1920 canvas) */
+.stage-app .safe-zone-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  font-size: calc(22px * var(--u));
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.stage-app .sz-covered {
+  position: absolute;
+  background: rgba(239, 68, 68, 0.28);
+  outline: 1px dashed rgba(254, 202, 202, 0.9);
+  color: #fee2e2;
+  padding: 0.3em 0.5em;
+}
+
+.stage-app .sz-margin {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(249, 115, 22, 0.22);
+}
+
+.stage-app .sz-face-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(34, 197, 94, 0.2);
+  border-top: 1px dashed rgba(134, 239, 172, 0.9);
+  border-bottom: 1px dashed rgba(134, 239, 172, 0.9);
+  color: #dcfce7;
+  text-align: right;
+  padding-right: 6%;
+}
+
+.stage-app .sz-divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.stage-app .sz-face {
+  position: absolute;
+  width: calc(28px * var(--u));
+  height: calc(28px * var(--u));
+  margin: calc(-14px * var(--u)) 0 0 calc(-14px * var(--u));
+  border-radius: 50%;
+  border: 3px solid currentColor;
+}
+
+.stage-app .sz-face.ok { color: #4ade80; }
+.stage-app .sz-face.bad { color: #f87171; }
+
+.stage-app .sz-face span {
+  position: absolute;
+  left: 140%;
+  top: -10%;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
 }
 
 /* lil-gui Light Theme Customization */

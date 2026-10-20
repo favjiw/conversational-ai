@@ -5,8 +5,8 @@ import App from './App.jsx'
 
 const StageApp = lazy(() => import('./stage/StageApp'))
 
-const isStageRoute =
-  window.location.pathname === '/stage' || window.location.pathname.startsWith('/stage/')
+// /stage (config default style), /stage-3d-realistic, /stage-animation
+const isStageRoute = /^\/stage(-3d-realistic|-animation)?(\/|$)/.test(window.location.pathname)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

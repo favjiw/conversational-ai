@@ -15,7 +15,7 @@ Sistem penyiar AI untuk live streaming TikTok HITS Unikom Radio: dua penyiar AI 
 
 1. AI ngobrol dengan AI (dua penyiar AI).
 2. Rekomendasi musik berdasarkan emosi (lagu dari API musik).
-3. Karakter 3D realistis berformat GLB (rig, 52 blendshape ARKit, material PBR) untuk penyiar pria dan wanita, dengan lip-sync dan ekspresi dari audio TTS. Menggantikan VRM bergaya anime (keputusan 15 Okt 2026); VRM tetap bisa dimuat sebagai cadangan.
+3. Karakter 3D untuk penyiar pria dan wanita, dengan lip-sync dan ekspresi dari audio TTS, dalam dua gaya yang bisa dipilih (keputusan 19 Okt 2026; sepasang penyiar selalu bergaya sama): **realistis** (GLB, rig, 52 blendshape ARKit, material PBR; halaman `/stage-3d-realistic`) dan **animasi/VTuber** (VRM; halaman `/stage-animation`). `/stage` memakai gaya default dari `avatar.config.json`.
 4. Membaca komentar TikTok lalu berimprovisasi: sebutkan username dan isi komentarnya, lalu jadikan topik sementara di dalam Tema yang sedang dibahas.
 
 Requirement penting: suara tidak boleh terdengar seperti robot penerjemah.
@@ -74,14 +74,14 @@ Istilah: 3M = Mencoba Mengerti Mahasiswa (penyiar berperan sebagai "Pak Dosen Ag
 - Suara: TTS yang ekspresif, bukan model voice-to-voice. Kandidat utama Gemini TTS multi-speaker (maksimal 2 pembicara, mendukung bahasa Indonesia, gaya diatur lewat prompt dan tag seperti [laughs]); `gemini-3.1-flash-tts-preview` mendukung streaming. Audio dibuat per giliran, bukan per segmen. Alternatif berbayar: ElevenLabs.
 - Alasan tidak memakai voice-to-voice: semua input sistem berupa teks (Tema, komentar); Supervisor harus mencegat teks sebelum audio dibuat; sesi Live API yang hanya audio dibatasi 15 menit.
 - Teks LLM harus ditulis untuk diucapkan: kalimat pendek, gaya "gue/lu", ada sahutan dan tawa, tanpa markdown. Transcript on-air HITS dipakai sebagai contoh gaya di prompt.
-- Avatar: GLB realistis dengan 52 blendshape ARKit, dirender three.js di halaman /stage repo ini. Lip-sync berbasis viseme dari teks dan timestamp kata TTS, cadangan dari amplitudo audio. Prototipe VRM lama di repo char-3d diarsipkan.
+- Avatar: dua gaya (GLB realistis dengan 52 blendshape ARKit, atau VRM anime), dirender three.js di halaman stage repo ini. Lip-sync kedua gaya berbasis viseme dari teks dan timestamp kata TTS (bentuk viseme model untuk GLB, lima vokal VRM untuk anime), cadangan dari amplitudo audio. Prototipe lama di repo char-3d diarsipkan.
 - Komentar TikTok: library tidak resmi (misalnya TikTokLive untuk Python). Cadangan: komentar diinput manual oleh operator.
 
 ## 8. Risiko dan kepatuhan
 
 - Pedoman TikTok Shop (17 September 2026) melarang "non-real-time verbal interaction such as AI-generated voices, audio recordings, or radio" dan animasi yang menutupi lebih dari 50% layar di LIVE jualan. Status untuk LIVE non-jualan belum jelas.
 - Mitigasi: label "AI" di layar dan pengumuman di pembukaan, ada operator manusia, dan Supervisor ikut memeriksa keamanan isi.
-- Tata letak live (keputusan 15 Okt 2026): split screen layar penuh (kiri penyiar pria, kanan penyiar wanita) dengan latar studio radio. Ini tidak memenuhi batas "avatar tidak lebih dari 50% layar" pada pedoman LIVE jualan; risiko diterima karena live HITS bukan LIVE jualan, dan perlu ditinjau ulang bila status aturannya berubah.
+- Tata letak live (keputusan 17 Okt 2026, menggantikan split kiri-kanan 15 Okt): kanvas portrait 9:16 (1080×1920) dengan dua panel bertumpuk seperti live HITS asli (atas penyiar pria, bawah penyiar wanita; urutan bisa ditukar lewat config) dan latar studio radio. Komposisi mengikuti zona aman TikTok: header 0–10%, bar bawah 93–100%, daftar komentar 65–91% tinggi × 0–70% lebar, margin sisi 5%; wajah atas di 22–28% tinggi, wajah bawah dinaikkan ke 55–60%. Avatar tetap memenuhi layar, jadi batas "tidak lebih dari 50% layar" untuk LIVE jualan tidak terpenuhi; risiko diterima karena live HITS bukan LIVE jualan, dan perlu ditinjau ulang bila status aturannya berubah.
 
 ## 9. Belum diputuskan
 
