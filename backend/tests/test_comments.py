@@ -249,6 +249,41 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snap["comments"][0]["id"], b.id)  # terbaru di atas
 
 
+class TestReadInTalk(unittest.IsolatedAsyncioTestCase):
+    async def test_general_comment_read_once_and_announced(self):
+        q, events = _queue()
+        halo, _ = await q.submit("budi", "halo kak salam dari bandung")
+        await q.wait_idle()
+        self.assertIs(q.next_general_comment(), halo)
+        await q.mark_read(halo.id, "s13")
+        self.assertEqual((halo.status, halo.slot_id), (cq.READ, "s13"))
+        self.assertIsNone(q.next_general_comment())  # tidak dibacakan lagi
+        await q.mark_read(halo.id, "s13")
+        read = events.of("comment_read")
+        self.assertEqual(len(read), 1)
+        self.assertIsNone(read[0][1])  # console + stage
+        self.assertEqual(read[0][0]["username"], "budi")
+
+    async def test_unmoderated_comment_never_read(self):
+        q, _ = _queue(FakeRecommender(ready=False))
+        await q.submit("x", "halo kak")
+        self.assertIsNone(q.next_general_comment())
+
+    async def test_rejected_comment_never_read(self):
+        q, _ = _queue()
+        await q.submit("troll", "komentar kasar")
+        await q.wait_idle()
+        self.assertIsNone(q.next_general_comment())
+
+    async def test_request_mentioned_once(self):
+        q, _ = _queue()
+        req, _ = await q.submit("andi", "puterin lagu Tulus")
+        await q.wait_idle()
+        self.assertIs(q.next_unmentioned_request(), req)
+        q.mark_request_mentioned(req.id)
+        self.assertIsNone(q.next_unmentioned_request())
+
+
 class TestCommentsEndpoint(unittest.TestCase):
     def setUp(self):
         import app.main as main

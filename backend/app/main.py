@@ -767,6 +767,7 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         recommender=recommender_service,
         talk_mood=settings.RECOMMENDER_TALK_MOOD,
         event_log=music_event_log,
+        comment_every_turns=settings.COMMENT_EVERY_TURNS,
     )
     music_event_log.set_session(session_id)
 

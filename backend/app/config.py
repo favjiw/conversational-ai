@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     RECOMMENDER_TIMEOUT_SEC: float = 8.0  # batas waktu satu rekomendasi sebelum fallback
     RECOMMENDER_MAX_PENDING: int = 5  # maks request lagu penonton yang menunggu
     RECOMMENDER_TALK_MOOD: bool = False  # lagu dari mood topik Talk (KEPUTUSAN-DESAIN §9 belum diputuskan)
+    # Komentar penonton dibacakan di Talk: satu komentar umum setiap N giliran (0 = tidak dibacakan).
+    COMMENT_EVERY_TURNS: int = 5
     RECOMMENDER_LLM_CACHE: bool = False  # cache jawaban LLM hits_rec; mati = latensi di log nyata
 
     # --- Testing ---

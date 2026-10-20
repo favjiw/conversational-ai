@@ -9,6 +9,7 @@ const STATUS = {
   rejected: { label: 'Ditolak', cls: 'bg-rose-100 text-rose-800' },
   unavailable: { label: 'Tidak tersedia', cls: 'bg-orange-100 text-orange-800' },
   general: { label: 'Komentar', cls: 'bg-slate-100 text-slate-600' },
+  read: { label: 'Dibacakan', cls: 'bg-violet-100 text-violet-800' },
 };
 
 const SERVICE = {
@@ -94,7 +95,7 @@ export default function CommentPanel({ commentQueue, submitComment }) {
               <div key={c.id} className="flex items-start gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
                 <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded ${st.cls}`}>
                   {st.label}
-                  {c.slot_id && (c.status === 'scheduled' || c.status === 'played') ? ` ${c.slot_id}` : ''}
+                  {c.slot_id && ['scheduled', 'played', 'read'].includes(c.status) ? ` ${c.slot_id}` : ''}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-gray-800 break-words">

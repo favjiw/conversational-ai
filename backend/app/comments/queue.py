@@ -41,6 +41,7 @@ PLAYED = "played"  # sudah diputar
 REJECTED = "rejected"  # ditolak moderasi
 UNAVAILABLE = "unavailable"  # request tanpa lagu yang bisa diputar (tidak tersedia)
 GENERAL = "general"  # komentar biasa untuk segmen Talk
+READ = "read"  # komentar biasa yang sudah dibacakan di Talk (dibacakan)
 
 ACTIVE_REQUEST = (WAITING, SCHEDULED)
 REQUEST_INTENTS = ("explicit_song", "mood_request")
@@ -66,9 +67,10 @@ class CommentEntry(BaseModel):
     received_at: float
     status: str = CLASSIFYING
     moderated: bool = False  # sudah melewati klasifikasi/moderasi LLM
-    slot_id: str = ""  # slot lagu tempat request dijadwalkan/diputar
+    slot_id: str = ""  # slot lagu tempat request dijadwalkan/diputar, atau slot Talk tempat dibacakan
     note: str = ""
     recommendation: Optional[SongRecommendation] = None
+    request_mentioned: bool = False  # request lagu sudah disebut penyiar di Talk
 
     def public(self) -> dict[str, Any]:
         """Bentuk untuk WS/HTTP."""
@@ -254,6 +256,35 @@ class CommentQueue:
                                 status=status, slot_id=entry.slot_id, note=entry.note)
         await self._emit_queue()
 
+    # ── Dipakai Talk (komentar dibacakan penyiar) ──
+
+    def next_general_comment(self) -> Optional[CommentEntry]:
+        """Komentar biasa tertua yang lolos moderasi LLM dan belum dibacakan."""
+        return next((e for e in self._entries if e.status == GENERAL and e.moderated), None)
+
+    async def mark_read(self, entry_id: str, slot_id: str) -> None:
+        """Komentar sudah dibawakan di Talk: tidak akan dibacakan lagi."""
+        entry = self.get(entry_id)
+        if entry is None or entry.status != GENERAL:
+            return
+        entry.status = READ
+        entry.slot_id = slot_id
+        if self._event_log is not None:
+            self._event_log.log("comment_read", comment_id=entry.id, username=entry.username,
+                                text=entry.text, slot_id=slot_id)
+        # Ke semua klien: console menampilkan "Dibacakan", stage bisa memakai untuk reading_comments.
+        await self._send("comment_read", entry.public(), None)
+        await self._emit_queue()
+
+    def next_unmentioned_request(self) -> Optional[CommentEntry]:
+        """Request lagu di antrean yang belum pernah disebut penyiar di Talk."""
+        return next((e for e in self._entries if e.status in ACTIVE_REQUEST and not e.request_mentioned), None)
+
+    def mark_request_mentioned(self, entry_id: str) -> None:
+        entry = self.get(entry_id)
+        if entry is not None:
+            entry.request_mentioned = True
+
     # ── Baca ──
 
     def get(self, entry_id: str) -> Optional[CommentEntry]:
@@ -308,7 +339,7 @@ class CommentQueue:
         excess = len(self._entries) - MAX_ENTRIES
         if excess <= 0:
             return
-        done = (PLAYED, REJECTED, UNAVAILABLE, GENERAL)
+        done = (PLAYED, REJECTED, UNAVAILABLE, GENERAL, READ)
         keep: list[CommentEntry] = []
         for entry in self._entries:
             if excess > 0 and entry.status in done:

@@ -187,5 +187,82 @@ class TestTalkPoints(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([t for t, _ in runner.events if t == "theme_change"], [])
 
 
+
+class _ReadyRecommender:
+    """Rekomendasi palsu: "halo/salam" = komentar biasa, "kasar" = moderasi, "puterin" = request."""
+
+    ready = True
+    status = "ready"
+
+    def status_info(self):
+        return {"status": "ready"}
+
+    async def recommend_for_comment(self, username, text):
+        from app.music.models import CatalogSong, SongRecommendation
+
+        if "kasar" in text:
+            return SongRecommendation(intent="not_a_request", needs_moderation=True)
+        if "puterin" in text:
+            return SongRecommendation(intent="explicit_song", song=CatalogSong(song_id="1", title="Hati-Hati di Jalan",
+                                                                              artist="Tulus"))
+        return SongRecommendation(intent="not_a_request")
+
+    def release(self, song_id):
+        pass
+
+    def mark_played(self, song_id):
+        pass
+
+
+class TestCommentsInTalk(unittest.IsolatedAsyncioTestCase):
+    async def test_comments_read_once_every_n_turns_and_request_mentioned(self):
+        from app.comments.queue import READ, CommentQueue
+
+        sent = []
+
+        async def broadcast(event_type, data, roles):
+            sent.append((event_type, data))
+
+        queue = CommentQueue(_ReadyRecommender(), broadcast=broadcast)
+        budi, _ = await queue.submit("budi_bdg", "halo kak salam dari bandung")
+        sari, _ = await queue.submit("sari", "visca barca!!")
+        troll, _ = await queue.submit("troll", "komentar kasar")
+        andi, _ = await queue.submit("andi", "puterin hati2 dijalan dong")
+        await queue.wait_idle()
+
+        llm = FakeLLM()
+        runner, slot = _runner(slot_sec=120, llm=llm, line_sec=10)
+        runner.comment_queue = queue
+        runner.comment_every_turns = 4
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        await asyncio.sleep(0.05)
+
+        def turns_mentioning(name):
+            return [i for i, p in enumerate(llm.prompts) if f"{name}:" in p and "Komentar penonton" in p]
+
+        self.assertEqual(len(turns_mentioning("budi_bdg")), 1)  # dibacakan sekali
+        self.assertEqual(len(turns_mentioning("sari")), 1)
+        self.assertEqual(turns_mentioning("troll"), [])  # ditolak moderasi, tidak dibacakan
+        gap = turns_mentioning("sari")[0] - turns_mentioning("budi_bdg")[0]
+        self.assertGreaterEqual(gap, 4)
+        self.assertIn("jangan jadikan topik utama", llm.prompts[turns_mentioning("sari")[0]])
+        self.assertEqual((budi.status, sari.status), (READ, READ))
+        self.assertEqual(budi.slot_id, slot.id)
+        self.assertEqual(sum(1 for p in llm.prompts if "request lagu dari penonton andi" in p), 1)
+        self.assertEqual([d["username"] for t, d in sent if t == "comment_read"], ["budi_bdg", "sari"])
+
+    async def test_no_comments_during_closing_turns(self):
+        from app.comments.queue import CommentQueue
+
+        queue = CommentQueue(_ReadyRecommender())
+        await queue.submit("budi", "halo kak")
+        await queue.wait_idle()
+        llm = FakeLLM()
+        runner, slot = _runner(slot_sec=20, llm=llm, line_sec=10)  # semua giliran sudah penutup
+        runner.comment_queue = queue
+        await asyncio.wait_for(runner._handle_talk_slot(slot), timeout=5)
+        self.assertFalse(any("Komentar penonton" in p for p in llm.prompts))
+
+
 if __name__ == "__main__":
     unittest.main()
