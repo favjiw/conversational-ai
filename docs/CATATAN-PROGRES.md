@@ -61,10 +61,13 @@ Butuh `pip install playwright imageio-ffmpeg` dan Google Chrome terpasang. Chrom
 
   Ubah keduanya bila mengganti pengaturan.
 - **TTS sekarang `TTS_PROVIDER=elevenlabs`** (model `eleven_flash_v2_5`).
-  - Voice persona: Raka `JBFqnCBsd6RMkjVDRZzb` (George), Salsa `EXAVITQu4vr4xnSDxMaL` (Sarah).
-  - `ELEVENLABS_VOICE_A=kLhAs…` di `.env` butuh paket berbayar (402), jadi otomatis jatuh ke George.
-  - Key ElevenLabs dibatasi (tidak bisa membaca kuota atau voice).
-  - **Key sempat ditulis di chat; rotasi key di dashboard ElevenLabs, lalu perbarui kedua `.env`.**
+  - Paket **Starter** (20 Okt), sehingga voice dari Voice Library bisa dipakai.
+  - Voice persona (suara Indonesia, dipilih Favian 20 Okt): Raka `q8qwd1jY2jS3AWOBeq25` (Pratama), Salsa `I7sakys8pBZ1Z5f0UhT9` (Putri Maharani), lewat `ELEVENLABS_VOICE_A/B` di kedua `.env`.
+  - Rundown memakai voice dari `.env`. Field `voice` di `app/data/persona/*.json` diabaikan saat `/api/clock/start`.
+  - Panggilan pertama tiap voice setelah backend start ±15 s (voice dimuat); berikutnya ±1,6 s.
+  - Sampel kandidat suara ada di `demo-recordings/voice-samples/` (di-gitignore).
+  - Key ElevenLabs dibatasi (hanya TTS; tidak bisa membaca kuota atau voice).
+  - **Key ElevenLabs dan Groq sempat ditulis di chat; rotasi key di dashboard masing-masing, lalu perbarui kedua `.env`.**
 - `frontend/public/avatar.config.json` berisi:
   - `defaultStyle`, `styles` (realistic dan animation: karakter dan tone mapping);
   - `program` (judul, stasiun, `pinnedQuestion`);

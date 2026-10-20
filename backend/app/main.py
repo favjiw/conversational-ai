@@ -745,6 +745,10 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         background_facts=["Penyiar radio hits Bandung", "Suka nonton konser"],
         do_not=["Jangan gunakan bahasa kaku"],
     )
+    # Voice from .env (TTS provider config) wins over the "voice" field in the persona files,
+    # so changing ELEVENLABS_VOICE_A/B or the Edge voices takes effect in the rundown.
+    persona_a = persona_a.model_copy(update={"voice": voice_a})
+    persona_b = persona_b.model_copy(update={"voice": voice_b})
 
     async def broadcast_clock_event(event: dict[str, Any]):
         await ws_manager.broadcast_json(event)
