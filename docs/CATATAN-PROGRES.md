@@ -15,7 +15,7 @@ Terakhir diperbarui: 20 Okt 2026.
   - PR #4: avatar realistis dan lip-sync viseme
   - PR #5: stage 9:16, dua gaya karakter, TTS ElevenLabs
   - PR #6: rekomendasi lagu dari komentar (§11), voice Indonesia, joget saat lagu
-- **Tes:** backend 149 tes lulus (`cd backend && python -m unittest discover -s tests`). `test_compute_factor_drift_stable` kadang gagal karena `np.random` tanpa seed (bawaan, tidak terkait). Frontend: type check, `vite build`, dan `oxlint src/stage` bersih.
+- **Tes:** backend 173 tes lulus (`cd backend && python -m unittest discover -s tests`). `test_compute_factor_drift_stable` kadang gagal karena `np.random` tanpa seed (bawaan, tidak terkait). Frontend: type check, `vite build`, dan `oxlint src/stage` bersih.
 - **Demo untuk pembimbing** sudah direkam di `demo-recordings/` (di-gitignore):
   - `demo-3d-realistic.mp4` (5 menit)
   - `demo-animation.mp4` (2 menit 22 detik)
