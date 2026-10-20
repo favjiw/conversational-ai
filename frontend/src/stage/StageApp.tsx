@@ -231,7 +231,7 @@ export function StageApp() {
         const audioManager = new AudioManager();
         audioManagerRef.current = audioManager;
         // Debug only: lets devtools read live blendshape values while tuning.
-        if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current };
+        if (isDebug) (window as any).__stage = { sceneManager, audioManager, expressionDrivers: expressionDriversRef.current, idleManagers: idleManagersRef.current };
 
         audioManager.onSpeakingChange = (personaId) => {
           if (mounted) setActiveSpeaker((personaId as any) || null);
@@ -584,6 +584,12 @@ export function StageApp() {
       : currentSlot?.label || topic
         ? { kind: 'talk', label: currentSlot?.label || 'Talk', topic: topic ?? undefined }
         : null;
+
+  // Debug: "Kartu: Lagu" also previews the music groove (live mode follows the song audio).
+  useEffect(() => {
+    if (!isDebug) return;
+    idleManagersRef.current.forEach(im => im.setMusicPlaying(displayCardMode === 'song'));
+  }, [isDebug, displayCardMode]);
 
   // Face markers for the safe-zone overlay (cheap: two projections, 4x per second)
   useEffect(() => {

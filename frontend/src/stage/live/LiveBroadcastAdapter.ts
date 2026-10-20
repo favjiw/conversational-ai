@@ -195,6 +195,7 @@ export class LiveBroadcastAdapter {
             this.musicAudio.pause();
             this.musicAudio.removeAttribute('src');
             this.musicAudio = null;
+            this.setMusicPlaying(false);
           }
         }
         break;
@@ -396,17 +397,29 @@ export class LiveBroadcastAdapter {
     }
   }
 
+  private setMusicPlaying(playing: boolean): void {
+    for (const idle of this.idleManagers.values()) {
+      idle.setMusicPlaying(playing);
+    }
+  }
+
   private playMusicAudio(url: string, data: LiveMusicData): void {
     if (this.musicAudio) {
       this.musicAudio.pause();
       this.musicAudio.removeAttribute('src');
       this.musicAudio = null;
+      this.setMusicPlaying(false);
     }
 
     const audio = new Audio(url);
     audio.muted = !this.isAudioOwner;
     this.musicAudio = audio;
     const maxSec = data.preview_sec || 30;
+
+    // Penyiar berjoget hanya selama audio lagu benar-benar berputar.
+    audio.onplaying = () => {
+      if (this.musicAudio === audio) this.setMusicPlaying(true);
+    };
 
     audio.ontimeupdate = () => {
       if (this.musicAudio !== audio) return;
@@ -418,6 +431,7 @@ export class LiveBroadcastAdapter {
       if (audio.currentTime >= maxSec) {
         audio.pause();
         this.musicAudio = null;
+        this.setMusicPlaying(false);
         this.sendFeedback(data, 'ended');
       }
     };
@@ -425,12 +439,14 @@ export class LiveBroadcastAdapter {
     audio.onended = () => {
       if (this.musicAudio !== audio) return;
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     };
 
     audio.onerror = () => {
       if (this.musicAudio !== audio) return;
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     };
 
@@ -438,6 +454,7 @@ export class LiveBroadcastAdapter {
       if (this.holdIfAutoplayBlocked(audio, err)) return;
       console.warn('[LiveBroadcastAdapter] Music preview error:', err);
       this.musicAudio = null;
+      this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     });
   }
@@ -488,6 +505,7 @@ export class LiveBroadcastAdapter {
       this.musicAudio.pause();
       this.musicAudio.removeAttribute('src');
       this.musicAudio = null;
+      this.setMusicPlaying(false);
     }
 
     for (const idle of this.idleManagers.values()) {
