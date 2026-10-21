@@ -163,7 +163,12 @@ Batasan dari Favian: jangan ubah logika LLM, rundown, prompt persona, lip-sync, 
 - **`aiodns` selalu timeout 20 s di laptop ini** (DNS sistem langsung menjawab). `aiohttp` otomatis memakai `aiodns` bila terpasang, jadi Edge TTS sempat gagal di ±40% giliran (21 Okt). Edge TTS sekarang memakai `aiohttp.ThreadedResolver` (resolver sistem). Pustaka lain berbasis `aiohttp` bisa kena masalah yang sama; `aiodns` tidak dibutuhkan paket mana pun dan bisa di-uninstall bila perlu.
 - Satu baris TTS di rundown dibatasi 20 s (`TTS_LINE_TIMEOUT_SEC`); lewat dari itu giliran tayang tanpa audio.
 - R3 (Audio2Face-3D) tidak bisa jalan di MX250 (butuh GPU Ampere/Blackwell dan ≥3–4,4 GiB VRAM). Pilihan "Metode" lip-sync di panel debug sudah siap untuk metode ketiga.
-- Gaya animasi: lengan VRM masih agak terbuka. Pose istirahat dengan tangan di meja baru ada untuk GLB.
+- Gaya animasi (21 Okt):
+  - Lengan VRM dikalibrasi per model (`RestPose.calibrate`, 10° dari vertikal, `restPose.armDownDeg` di `avatar.config.json`). Sebelumnya `female.vrm` tertahan di pose A.
+  - Saat bicara ada gerak ala VTuber (`idle/TalkMotion.ts`: kepala menoleh/miring ke target acak, anggukan, badan ikut sebagian); saat mendengar hanya ayunan kecil dan anggukan sesekali.
+  - Joget saat lagu dibuat kalem: tangan di bawah, goyang kecil.
+  - Semua bisa disetel lewat `talkMotion` / `groove` di `avatar.config.json`.
+  - Pose tangan di meja baru ada untuk GLB.
 - Frame rate rekaman demo sekitar 20 fps (screencast CDP pada 1080×1920), diekspor 30 fps.
 - Frame rate live di Intel UHD 620 belum terukur langsung. Biaya render pada 1080×1920 sekitar 10 ms/frame (kualitas medium).
 

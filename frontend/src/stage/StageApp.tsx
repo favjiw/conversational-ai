@@ -9,6 +9,9 @@ import { AudioManager } from './audio/AudioManager';
 import { LipSyncLevel1, type LipSyncConfig } from './lipsync/LipSyncLevel1';
 import { ExpressionDriver, type EmotionType, type ExpressionConfig } from './expression/ExpressionDriver';
 import { IdleManager, type IdleConfig } from './idle/IdleManager';
+import { RestPose } from './idle/RestPose';
+import type { TalkMotionConfig } from './idle/TalkMotion';
+import type { GrooveConfig } from './idle/MusicGroove';
 import { ScenarioPlayer, type ScenarioData, type ScenarioTurn, type PlayerState } from './scenario/ScenarioPlayer';
 import { DebugPanel, type DebugConfig } from './debug/DebugPanel';
 import { PortraitHUD, type InfoCard, type ProgramInfo } from './components/PortraitHUD';
@@ -76,6 +79,12 @@ interface AvatarConfigFile {
   lipsync?: Partial<LipSyncConfig>;
   expression?: Partial<ExpressionConfig>;
   idle?: Partial<IdleConfig>;
+  /** Animation style: VTuber-like head/torso motion while speaking and listening. */
+  talkMotion?: Partial<TalkMotionConfig>;
+  /** Animation style: groove while a song plays. */
+  groove?: Partial<GrooveConfig>;
+  /** Animation style: arms hang this many degrees from vertical (calibrated per model). */
+  restPose?: { armDownDeg?: number };
   glbFace?: { jawScale?: number };
   viseme?: Partial<VisemeLipSyncConfig>;
   /** Program overlay: title, station, pinned bait question. */
@@ -338,6 +347,11 @@ export function StageApp() {
             expressionDriversRef.current.set(personaId, ed);
 
             const im = new IdleManager(char.vrm, ed.getAdapter(), ed, debugConfig.idle);
+            if (avatarConfig.restPose?.armDownDeg !== undefined) {
+              RestPose.calibrate(char.vrm, avatarConfig.restPose.armDownDeg);
+            }
+            if (avatarConfig.talkMotion) im.setTalkMotionConfig(avatarConfig.talkMotion);
+            if (avatarConfig.groove) im.setGrooveConfig(avatarConfig.groove);
             idleManagersRef.current.set(personaId, im);
           }
         });
