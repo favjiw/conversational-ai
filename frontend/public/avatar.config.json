@@ -57,6 +57,23 @@
     "headSway": 0.3,
     "breath": 0.4
   },
+  "restPose": {
+    "armDownDeg": 10
+  },
+  "talkMotion": {
+    "headYaw": 0.22,
+    "headRoll": 0.1,
+    "nod": 0.035,
+    "torsoFollow": 0.35,
+    "listenYaw": 0.06,
+    "listenNod": 0.05
+  },
+  "groove": {
+    "bpm": 92,
+    "torsoYaw": 0.06,
+    "headNod": 0.05,
+    "armSwing": 0.06
+  },
   "glbFace": {
     "jawScale": 0.7
   },

@@ -2,10 +2,11 @@ import type { VRM } from '@pixiv/three-vrm';
 import type * as THREE from 'three';
 
 /**
- * Simple "groove" while a song plays (animation/VRM style): the torso turns left-right,
- * the head nods on the beat and follows the turn, and the arms lift a little with bent
- * elbows that pump alternately. Applied on top of RestPose + idle every frame, eased in/out
- * so the presenters settle back smoothly when the song ends.
+ * Calm "groove" while a song plays (animation/VRM style): the torso sways a little left-right,
+ * the head nods on the beat and follows the sway, and the hands stay low with a small
+ * alternating swing. Applied on top of RestPose + idle every frame, eased in/out so the
+ * presenters settle back smoothly when the song ends. Values can be overridden in
+ * avatar.config.json ("groove").
  */
 export interface GrooveConfig {
   /** Tempo of the movement (no beat detection: Deezer previews are not analysed). */
@@ -26,23 +27,26 @@ export interface GrooveConfig {
   armOut: number;
   /** Elbow bend (radians). */
   elbowBend: number;
-  /** Finger curl per joint (radians): loose fists instead of open palms. */
+  /** Finger curl per joint (radians): relaxed hands instead of flat palms. */
   fingerCurl: number;
+  /** Alternating arm swing on the beat (radians). */
+  armSwing: number;
   /** Seconds to blend in/out. */
   blendSec: number;
 }
 
 export const DEFAULT_GROOVE: GrooveConfig = {
-  bpm: 100,
-  torsoYaw: 0.16,
-  torsoRoll: 0.05,
-  headNod: 0.07,
-  headYaw: 0.12,
+  bpm: 92,
+  torsoYaw: 0.06,
+  torsoRoll: 0.03,
+  headNod: 0.05,
+  headYaw: 0.05,
   arms: 1,
-  armForward: 0.5,
-  armOut: -0.15,
-  elbowBend: 1.5,
-  fingerCurl: 0.9,
+  armForward: 0.08,
+  armOut: 0,
+  elbowBend: 0.25,
+  fingerCurl: 0.2,
+  armSwing: 0.06,
   blendSec: 0.8,
 };
 
@@ -117,7 +121,7 @@ export class MusicGroove {
       head.rotation.z += -turn * 0.03 * zSign * w;
     }
 
-    // Arms: lifted slightly forward with bent elbows, pumping alternately on the beat.
+    // Arms: hands stay low, slightly forward with a small alternating swing on the beat.
     // Upper arm forward is -x * xSign (measured on both VRM versions; opposite of RestPose's x).
     const c = this.config;
     const a = c.arms * w;
@@ -131,21 +135,21 @@ export class MusicGroove {
     const leftHand = humanoid.getNormalizedBoneNode('leftHand');
     const rightHand = humanoid.getNormalizedBoneNode('rightHand');
     if (leftUpper) {
-      leftUpper.rotation.x += -(c.armForward + pumpL * 0.12) * xSign * a; // forward
+      leftUpper.rotation.x += -(c.armForward + pumpL * c.armSwing) * xSign * a; // forward
       leftUpper.rotation.z += c.armOut * zSign * a; // away from the body
     }
     if (rightUpper) {
-      rightUpper.rotation.x += -(c.armForward + pumpR * 0.12) * xSign * a;
+      rightUpper.rotation.x += -(c.armForward + pumpR * c.armSwing) * xSign * a;
       rightUpper.rotation.z += -c.armOut * zSign * a;
     }
     // Elbow flexion forward: left -y, right +y on both VRM 0.x and 1.0 normalized bones
     // (measured: forearm moves toward the camera).
-    if (leftLower) leftLower.rotation.y += -(c.elbowBend + pumpL * 0.3) * a;
-    if (rightLower) rightLower.rotation.y += (c.elbowBend + pumpR * 0.3) * a;
-    if (leftHand) leftHand.rotation.z += pumpL * 0.15 * zSign * a;
-    if (rightHand) rightHand.rotation.z += -pumpR * 0.15 * zSign * a;
+    if (leftLower) leftLower.rotation.y += -(c.elbowBend + pumpL * c.armSwing * 2) * a;
+    if (rightLower) rightLower.rotation.y += (c.elbowBend + pumpR * c.armSwing * 2) * a;
+    if (leftHand) leftHand.rotation.z += pumpL * c.armSwing * zSign * a;
+    if (rightHand) rightHand.rotation.z += -pumpR * c.armSwing * zSign * a;
 
-    // Loose fists: curl the four fingers (tip toward the palm). Left -z, right +z (zSign for VRM 0.x).
+    // Relaxed fingers: curl the four fingers (tip toward the palm). Left -z, right +z (zSign for VRM 0.x).
     const curl = c.fingerCurl * a;
     if (curl > 0) {
       for (const finger of FINGERS) {

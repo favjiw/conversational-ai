@@ -9,6 +9,9 @@ import { AudioManager } from './audio/AudioManager';
 import { LipSyncLevel1, type LipSyncConfig } from './lipsync/LipSyncLevel1';
 import { ExpressionDriver, type EmotionType, type ExpressionConfig } from './expression/ExpressionDriver';
 import { IdleManager, type IdleConfig } from './idle/IdleManager';
+import { RestPose } from './idle/RestPose';
+import type { TalkMotionConfig } from './idle/TalkMotion';
+import type { GrooveConfig } from './idle/MusicGroove';
 import { ScenarioPlayer, type ScenarioData, type ScenarioTurn, type PlayerState } from './scenario/ScenarioPlayer';
 import { DebugPanel, type DebugConfig } from './debug/DebugPanel';
 import { PortraitHUD, type InfoCard, type ProgramInfo } from './components/PortraitHUD';
@@ -76,6 +79,12 @@ interface AvatarConfigFile {
   lipsync?: Partial<LipSyncConfig>;
   expression?: Partial<ExpressionConfig>;
   idle?: Partial<IdleConfig>;
+  /** Animation style: VTuber-like head/torso motion while speaking and listening. */
+  talkMotion?: Partial<TalkMotionConfig>;
+  /** Animation style: groove while a song plays. */
+  groove?: Partial<GrooveConfig>;
+  /** Animation style: arms hang this many degrees from vertical (calibrated per model). */
+  restPose?: { armDownDeg?: number };
   glbFace?: { jawScale?: number };
   viseme?: Partial<VisemeLipSyncConfig>;
   /** Program overlay: title, station, pinned bait question. */
@@ -144,6 +153,8 @@ export function StageApp() {
   const [currentTime, setCurrentTime] = useState<string>(formatWibTime);
   const [songProgress, setSongProgress] = useState(45);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  // Output routing from the backend: does this tab play the audio, how many stage tabs are open.
+  const [outputInfo, setOutputInfo] = useState<{ isOwner: boolean; stages: number }>({ isOwner: true, stages: 1 });
 
   const [sourceMode, setSourceMode] = useState<'scenario' | 'live'>(() => {
     if (typeof window === 'undefined') return 'scenario';
@@ -338,6 +349,11 @@ export function StageApp() {
             expressionDriversRef.current.set(personaId, ed);
 
             const im = new IdleManager(char.vrm, ed.getAdapter(), ed, debugConfig.idle);
+            if (avatarConfig.restPose?.armDownDeg !== undefined) {
+              RestPose.calibrate(char.vrm, avatarConfig.restPose.armDownDeg);
+            }
+            if (avatarConfig.talkMotion) im.setTalkMotionConfig(avatarConfig.talkMotion);
+            if (avatarConfig.groove) im.setGrooveConfig(avatarConfig.groove);
             idleManagersRef.current.set(personaId, im);
           }
         });
@@ -469,6 +485,10 @@ export function StageApp() {
 
         liveAdapter.onAutoplayBlocked = () => {
           if (mounted) setAudioUnlocked(false);
+        };
+
+        liveAdapter.onOutputStatus = (isOwner, stages) => {
+          if (mounted) setOutputInfo({ isOwner, stages });
         };
 
         liveAdapter.connect();
@@ -631,6 +651,11 @@ export function StageApp() {
     }
   };
 
+  // Tell the backend when autoplay holds this tab's audio, so the operator console warns.
+  useEffect(() => {
+    if (!loading) liveAdapterRef.current?.reportAudioState(!audioUnlocked);
+  }, [audioUnlocked, loading]);
+
   const handleToggleSourceMode = (mode: 'scenario' | 'live') => {
     setSourceMode(mode);
     if (mode === 'live') {
@@ -715,11 +740,19 @@ export function StageApp() {
 
         {showSafeZones && !loading && <SafeZoneOverlay faces={faceMarkers} />}
 
-        {/* Non-blocking Audio Unlock Banner */}
-        {!audioUnlocked && !loading && !isClean && (
-          <div className="audio-unlock-banner">
+        {/* Non-blocking Audio Unlock Banner (compact in ?clean=1; gone after the first click) */}
+        {!audioUnlocked && !loading && (
+          <div className={`audio-unlock-banner ${isClean ? 'compact' : ''}`}>
             <span className="audio-icon">🔊</span>
-            <span>Klik di mana saja untuk mengaktifkan audio siaran</span>
+            <span>{isClean ? 'Klik untuk mengaktifkan audio' : 'Klik di mana saja untuk mengaktifkan audio siaran'}</span>
+          </div>
+        )}
+
+        {/* Another stage tab owns the audio: this one stays silent */}
+        {!loading && !outputInfo.isOwner && outputInfo.stages > 1 && (
+          <div className={`audio-unlock-banner warn ${isClean ? 'compact' : ''}`}>
+            <span className="audio-icon">🔇</span>
+            <span>Tab stage lain yang memutar audio ({outputInfo.stages} tab terbuka). Tutup tab lainnya.</span>
           </div>
         )}
 

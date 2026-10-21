@@ -87,6 +87,8 @@ class ConnectionManager:
     def __init__(self):
         # Insertion order = connection order, used for owner election.
         self.active_connections: dict[WebSocket, str] = {}
+        # Clients that report their audio is held by the browser's autoplay policy.
+        self.audio_blocked: set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket, role: str = "console"):
         await websocket.accept()
@@ -97,6 +99,7 @@ class ConnectionManager:
         )
 
     def disconnect(self, websocket: WebSocket):
+        self.audio_blocked.discard(websocket)
         if websocket in self.active_connections:
             role = self.active_connections.pop(websocket)
             logger.info("WebSocket client disconnected (role=%s). Total: %d", role, len(self.active_connections))
@@ -117,7 +120,18 @@ class ConnectionManager:
             "audio_owner_role": self.active_connections.get(owner) if owner else None,
             "stage_connected": "stage" in roles,
             "clients": {role: roles.count(role) for role in CLIENT_ROLES},
+            # The client that should play audio is blocked by autoplay (needs a click on that tab).
+            "owner_audio_blocked": owner is not None and owner in self.audio_blocked,
         }
+
+    def set_audio_blocked(self, websocket: WebSocket, blocked: bool) -> bool:
+        """Record a client's autoplay state; True when it changed."""
+        was = websocket in self.audio_blocked
+        if blocked:
+            self.audio_blocked.add(websocket)
+        else:
+            self.audio_blocked.discard(websocket)
+        return was != blocked
 
     async def broadcast_output_status(self):
         """Send every client its own view of the output routing."""
@@ -146,7 +160,7 @@ ws_manager = ConnectionManager()
 
 # ── App State & Engine Singletons ───────────────────────────────────────────
 
-rate_limiter_registry = RateLimiterRegistry(default_rpm=5)
+rate_limiter_registry = RateLimiterRegistry(default_rpm=settings.GEMINI_RPM)
 
 llm_client = create_llm_client(
     mode=settings.LLM_MODE,
@@ -707,7 +721,7 @@ def get_pagi_bener_clock():
 
 class StartClockRequest(BaseModel):
     demo_music_sec: Optional[int] = 30
-    talk_turns_per_slot: Optional[int] = 2
+    talk_turns_per_slot: Optional[int] = None  # None = Talk mengikuti durasi slot; angka = override demo
 
 @app.post("/api/clock/start")
 async def start_clock_session(req: StartClockRequest = StartClockRequest()):
@@ -762,11 +776,12 @@ async def start_clock_session(req: StartClockRequest = StartClockRequest()):
         music_provider=music_provider,
         broadcast_fn=broadcast_clock_event,
         demo_music_sec=req.demo_music_sec or 30,
-        talk_turns_per_slot=req.talk_turns_per_slot or 2,
+        talk_turns_per_slot=req.talk_turns_per_slot or None,
         comment_queue=comment_queue,
         recommender=recommender_service,
         talk_mood=settings.RECOMMENDER_TALK_MOOD,
         event_log=music_event_log,
+        comment_every_turns=settings.COMMENT_EVERY_TURNS,
     )
     music_event_log.set_session(session_id)
 
@@ -849,6 +864,13 @@ async def websocket_session_endpoint(websocket: WebSocket, role: str = "console"
                         continue
                     if clock_runner_instance:
                         clock_runner_instance.playback_feedback(cmd.get("data", {}))
+                elif cmd.get("action") == "audio_state":
+                    # A stage reports whether autoplay holds its audio; consoles show a warning.
+                    blocked = bool((cmd.get("data") or {}).get("blocked"))
+                    if ws_manager.set_audio_blocked(websocket, blocked):
+                        logger.info("Client (role=%s) audio %s", ws_manager.active_connections.get(websocket),
+                                    "blocked by autoplay" if blocked else "unlocked")
+                        await ws_manager.broadcast_output_status()
                 elif cmd.get("action") == "speaking":
                     # The audio owner reports who is audible so muted consoles
                     # can still light the right speaker card.

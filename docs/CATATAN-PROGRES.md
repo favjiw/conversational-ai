@@ -8,18 +8,14 @@ Terakhir diperbarui: 20 Okt 2026.
 
 ## 1. Status singkat
 
-- **Branch aktif: `song-recommender`**, dibuat dari `stage-portrait`. Isinya integrasi rekomendasi lagu (§11), **belum di-commit**.
-- **PR #5 (`stage-portrait`)** menunggu review/merge:
-  - Tahap 1 (layout 9:16)
-  - dua gaya karakter
-  - TTS ElevenLabs
-  - Tahap 2 (HUD 9:16)
-  - skrip rekam demo
+- **Branch aktif: `talk-durasi`** (PR #7 ke `main`). Isinya Talk panjang berbasis durasi, komentar dibacakan, dan gaya HITS (§12).
 - **Sudah di-merge ke `main`:**
   - PR #1/#2: peran WebSocket console vs stage
   - PR #3: rekaman stasiun, persiapan lagu di belakang layar, rundown 1 jam
   - PR #4: avatar realistis dan lip-sync viseme
-- **Tes:** backend 149 tes lulus (`cd backend && python -m unittest discover -s tests`). `test_compute_factor_drift_stable` kadang gagal karena `np.random` tanpa seed (bawaan, tidak terkait). Frontend: type check, `vite build`, dan `oxlint src/stage` bersih.
+  - PR #5: stage 9:16, dua gaya karakter, TTS ElevenLabs
+  - PR #6: rekomendasi lagu dari komentar (§11), voice Indonesia, joget saat lagu
+- **Tes:** backend 173 tes lulus (`cd backend && python -m unittest discover -s tests`). `test_compute_factor_drift_stable` kadang gagal karena `np.random` tanpa seed (bawaan, tidak terkait). Frontend: type check, `vite build`, dan `oxlint src/stage` bersih.
 - **Demo untuk pembimbing** sudah direkam di `demo-recordings/` (di-gitignore):
   - `demo-3d-realistic.mp4` (5 menit)
   - `demo-animation.mp4` (2 menit 22 detik)
@@ -31,7 +27,7 @@ cd backend && python -m uvicorn app.main:app --port 8000
 cd frontend && npx vite --port 3000
 ```
 
-Konfigurasi preview juga ada di `.claude/launch.json` (`backend`, `backend-mock`, `frontend`).
+Konfigurasi preview juga ada di `.claude/launch.json` (`backend`, `backend-mock`, `backend-rec`, `backend-edge`, `frontend`). `backend-edge` = TTS Edge (gratis) + rekomendasi aktif, untuk uji Talk panjang.
 
 | Halaman | Fungsi |
 |---|---|
@@ -84,7 +80,7 @@ Butuh `pip install playwright imageio-ffmpeg` dan Google Chrome terpasang. Chrom
   - Status live tetap benar setelah reload (`live_state()`).
   - Endpoint `/api/tts/line`, `/station-audio/{file}`, `/api/clock/start|stop|next`, `/api/session/start|stop`.
 - `orchestrator/clock_runner.py`
-  - Rundown 42 slot (`clock-pagi-bener-live-1jam.json`, sesuai `docs/RUNDOWN-LIVE-1-JAM-DRAF.md`).
+  - Rundown v2.1 (`clock-pagi-bener-live-1jam.json` v0.3, sesuai `docs/RUNDOWN-LIVE-1-JAM-DRAF.md`): 5 lagu, Talk 3-10 menit/slot.
   - Slot `static_audio` memutar rekaman; tanpa file, slot dilewati.
   - Lagu disiapkan satu slot di depan (Deezer, intro dan backsell LLM, TTS secara paralel).
   - Event `turn` membawa `word_timings`.
@@ -148,22 +144,31 @@ Batasan dari Favian: jangan ubah logika LLM, rundown, prompt persona, lip-sync, 
 ## 7. Pertentangan dengan KEPUTUSAN-DESAIN yang belum dikerjakan
 
 1. Tiga jenis segmen Talk (naskah tetap / improvisasi / roleplay) belum dibedakan, dan belum ada parsing Tema `.docx`.
-2. Pipelining giliran Talk: giliran berikutnya baru dibuat setelah audio selesai (hanya lagu yang disiapkan lebih dulu).
+2. ~~Pipelining giliran Talk~~: selesai 21 Okt di mode clock (§12). Mode sesi (`/api/session/start`) belum memakai pipelining.
 3. TTS yang dipilih di keputusan adalah Gemini multi-speaker; yang dipakai sekarang ElevenLabs.
 4. Belum ada:
    - pengambilan komentar TikTok otomatis (sekarang input manual operator, §11);
    - Supervisor di jalur live (komentar baru dimoderasi oleh LLM rekomendasi, bukan Supervisor);
    - musik berdasarkan emosi **sebagian**: mood/request dari komentar sudah jalan; mood topik Talk ada di belakang flag `RECOMMENDER_TALK_MOOD` karena §9 belum diputuskan;
    - log latensi per tahap **sebagian**: rekomendasi lagu + Deezer sudah dicatat (`logs/{session_id}.music.jsonl`); LLM persona, Supervisor, dan TTS per giliran belum.
-5. Isi Tema masih contoh. Pembagian peran 3M/SKEMA dan posisi Bumper Skema masih asumsi.
+5. Isi Tema masih contoh (termasuk `points` per slot). Pembagian peran 3M/SKEMA dan posisi Bumper Skema masih asumsi.
+6. **Rundown v2.1 menyimpang dari KEPUTUSAN §4** ("urutan elemen asli dipertahankan"): lagu 11 → 5 dan tidak berturutan, SPOT/ADLIBS 1×/kuartal, s22 diputar sebelum s21, Teaser 3M digabung ke Talk 3. Menunggu persetujuan HITS dan pembimbing; KEPUTUSAN-DESAIN belum diubah.
+7. Supervisor masih menilai drift tanpa membedakan akomodasi gaya (lihat ANALISIS-LIVE-TIKTOK §3.4); belum dikerjakan.
 
 ## 8. Catatan teknis dan jebakan
 
 - Stage pertama yang tersambung menjadi pemutar audio. Tutup tab `/stage` lain saat siaran atau merekam.
 - Jangan mengedit file frontend saat merekam, karena hot-reload Vite akan memuat ulang stage.
 - Internet laptop kadang putus (DNS). Unduhan lagu di skrip rekam sudah memakai retry.
+- **`aiodns` selalu timeout 20 s di laptop ini** (DNS sistem langsung menjawab). `aiohttp` otomatis memakai `aiodns` bila terpasang, jadi Edge TTS sempat gagal di ±40% giliran (21 Okt). Edge TTS sekarang memakai `aiohttp.ThreadedResolver` (resolver sistem). Pustaka lain berbasis `aiohttp` bisa kena masalah yang sama; `aiodns` tidak dibutuhkan paket mana pun dan bisa di-uninstall bila perlu.
+- Satu baris TTS di rundown dibatasi 20 s (`TTS_LINE_TIMEOUT_SEC`); lewat dari itu giliran tayang tanpa audio.
 - R3 (Audio2Face-3D) tidak bisa jalan di MX250 (butuh GPU Ampere/Blackwell dan ≥3–4,4 GiB VRAM). Pilihan "Metode" lip-sync di panel debug sudah siap untuk metode ketiga.
-- Gaya animasi: lengan VRM masih agak terbuka. Pose istirahat dengan tangan di meja baru ada untuk GLB.
+- Gaya animasi (21 Okt):
+  - Lengan VRM dikalibrasi per model (`RestPose.calibrate`, 10° dari vertikal, `restPose.armDownDeg` di `avatar.config.json`). Sebelumnya `female.vrm` tertahan di pose A.
+  - Saat bicara ada gerak ala VTuber (`idle/TalkMotion.ts`: kepala menoleh/miring ke target acak, anggukan, badan ikut sebagian); saat mendengar hanya ayunan kecil dan anggukan sesekali.
+  - Joget saat lagu dibuat kalem: tangan di bawah, goyang kecil.
+  - Semua bisa disetel lewat `talkMotion` / `groove` di `avatar.config.json`.
+  - Pose tangan di meja baru ada untuk GLB.
 - Frame rate rekaman demo sekitar 20 fps (screencast CDP pada 1080×1920), diekspor 30 fps.
 - Frame rate live di Intel UHD 620 belum terukur langsung. Biaya render pada 1080×1920 sekitar 10 ms/frame (kualitas medium).
 
@@ -289,3 +294,52 @@ Backend `backend-rec` (Groq `qwen/qwen3.8-27b`, persona Gemini live, TTS mock), 
 - Persiapan lagu total 5–28 s, didominasi LLM intro/backsell persona. Semuanya disiapkan sebelum slotnya, jadi tidak terdengar sebagai jeda.
 - Contoh intro request (Gemini): "Halo pisan nih buat tulus_fans yang udah mampir di live TikTok kita dan request lagu Hati-Hati di Jalan dari Tulus. …"
 - Catatan: intro sempat menyebut "sore" padahal program pagi. Prompt intro tidak memberi konteks waktu (berlaku juga untuk intro non-request).
+
+## 12. Talk panjang dan gaya live HITS (branch `talk-durasi`, 21 Okt)
+
+Bahan: handoff `penyiar-ai-handoff.zip` (rundown v2.1, `docs/ANALISIS-LIVE-TIKTOK-2026-10-20.md`, `docs/TRANSKRIP-LIVE-TIKTOK-2026-10-20.md`, `backend/data/reference/hits-live-2026-10-20-{onair,offair}.txt`).
+
+**Yang berubah di mode clock**
+- **Talk berbasis durasi slot.** `TalkBudget` di `clock_runner.py` menjumlahkan `duration_sec` audio tiap giliran terhadap `slot.duration_sec`.
+  - Giliran penutup saat sisa waktu < ±30 s (maks 2): `TALK_CLOSING_HINT` di prompt, tercatat `wrap_up`.
+  - Berhenti saat sisa < setengah giliran rata-rata.
+  - Batas aman `duration_sec // 8` giliran.
+  - `talk_turns_per_slot` hanya override demo cepat (`record_demo.py`, `e2e_song_requests.py` masih memakainya).
+- **Pipelining.** Audio giliran n diputar di task latar sementara teks dan TTS giliran n+1 dibuat. Urutan audio tetap; skip/stop membatalkan audio yang berjalan.
+- **Poin materi.** `points` di `data/tema/pagi_bener.json` dibawakan berurutan mengikuti waktu yang sudah terucap, tanpa kembali ke poin awal. Event `theme_change` dikirim per poin. s21 = Say Hi lanjutan, Teaser 3M di poin terakhir. Slot tanpa materi memakai topik umum + `logger.warning`.
+- **Komentar dibacakan.** Tiap `COMMENT_EVERY_TURNS` giliran (default 5), satu komentar `general` yang lolos moderasi LLM disisipkan ke prompt (sebut nama + isi, bereaksi, kaitkan ke topik; di luar topik cukup dijembatani).
+  - Status menjadi `read` ("Dibacakan sXX" di konsol), event `comment_read` ke console + stage, dan dicatat di log musik.
+  - Request lagu yang antre disebut sekali ("request dari ... udah masuk antrean ya").
+  - Giliran penutup tidak membacakan komentar.
+- **Gaya HITS** (`app/conversation/hits_style.py`): panduan ringkas + 3 contoh dari rekaman on-air, ditambah petunjuk posisi:
+  - pembuka teaser, atau rekap lagu bila Talk tepat setelah lagu;
+  - "Sobat Hits" tiap ±5 giliran;
+  - penutup menggantung / pesan untuk pendengar.
+
+  Prompt mode sesi dan eksperimen A/B/C tidak berubah (ada test-nya).
+
+**Konfigurasi baru:** `GEMINI_RPM` (default 5) dan `COMMENT_EVERY_TURNS` (default 5).
+
+**Kebutuhan kuota per sesi 1 jam** (perkiraan)
+- **Persona Gemini:** ±150-185 giliran Talk + ±13 baris lagu/adlibs, total ±165-200 request; selama Talk ±4-5 RPM.
+  - Limit `GEMINI_RPM=5` pas di batas; throttle sesekali tersembunyi oleh pipelining.
+  - Supervisor (bila nanti aktif di clock) menggandakan beban dan melewati 5 RPM.
+  - Kuota harian free tier `gemini-3.5-flash-lite` perlu dicek di AI Studio.
+- **ElevenLabs:** ±31-34 ribu karakter/sesi (±17 ribu kredit dengan flash v2.5). Starter ±30 ribu kredit/bulan, jadi ±1-2 sesi penuh per bulan. Uji pengembangan pakai `backend-edge`.
+
+**Uji:** `tests/test_clock_talk.py` (durasi, penutup, batas aman, pipelining, poin, komentar, gaya) dan `tests/test_comments.py`. Ujung-ke-ujung: jalankan `backend-edge`, tutup tab `/stage`, lalu `python scripts/e2e_talk_duration.py --until s13`.
+
+**Hasil uji ujung-ke-ujung (21 Okt, `backend-edge`, s01-s13, stage tiruan yang menunggu durasi audio)**
+
+| Slot | Target | Audio | Giliran | Jeda antar-giliran |
+|---|---|---|---|---|
+| s10 Opening | 240 s | 243 s | 18 (2 penutup) | rata-rata 0,01 s, maks 0,03 s |
+| s13 Say Hi | 300 s | 300 s | 22 (2 penutup) | rata-rata 0,01 s, maks 0,02 s |
+
+- Poin materi dibawakan berurutan.
+- Tiga komentar dibacakan masing-masing sekali.
+- s13 dibuka dengan rekap lagu s11.
+- Uji pertama (sebelum perbaikan resolver Edge) menunjukkan jeda rata-rata 5-10 s karena ±40% giliran gagal TTS (lihat §8).
+- s07 (30 s) sempat selesai tanpa giliran penutup; ambang penutup diperbaiki (`1,4 x` rata-rata giliran).
+
+**Di luar lingkup (menunggu keputusan HITS):** perilaku slot lagu di TikTok (diputar, diganti obrolan off-air, atau hanya "Now playing"; ANALISIS §3.1), dan wawancara bintang tamu manusia (ANALISIS §3.5).

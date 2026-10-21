@@ -1,6 +1,7 @@
 import type { VRM } from '@pixiv/three-vrm';
 import { RestPose } from './RestPose';
 import { MusicGroove, type GrooveConfig } from './MusicGroove';
+import { TalkMotion, type TalkMotionConfig } from './TalkMotion';
 import type { ExpressionAdapter } from '../expression/ExpressionAdapter';
 import type { ExpressionDriver } from '../expression/ExpressionDriver';
 
@@ -42,6 +43,8 @@ export class IdleManager {
 
   /** Joget sederhana saat lagu diputar (lapisan di atas idle). */
   private groove: MusicGroove;
+  /** Gerak ala VTuber saat bicara / mendengar (lapisan di atas idle). */
+  private talk: TalkMotion;
 
   constructor(
     vrm: VRM,
@@ -56,9 +59,12 @@ export class IdleManager {
 
     // Fase acak kecil: dua penyiar bergerak di tempo yang sama tapi tidak identik.
     this.groove = new MusicGroove({}, Math.random() * 0.8);
+    this.talk = new TalkMotion();
 
     this.scheduleNextBlink();
     this.scheduleNextSaccade();
+    // Sudut lengan turun dihitung per model (pose A di female.vrm dengan sudut tetap).
+    RestPose.calibrate(this.vrm);
     RestPose.apply(this.vrm);
   }
 
@@ -69,6 +75,10 @@ export class IdleManager {
 
   setGrooveConfig(config: Partial<GrooveConfig>): void {
     this.groove.setConfig(config);
+  }
+
+  setTalkMotionConfig(config: Partial<TalkMotionConfig>): void {
+    this.talk.setConfig(config);
   }
 
   getConfig(): IdleConfig {
@@ -101,6 +111,9 @@ export class IdleManager {
     this.updateBreathing(deltaTime, humanoid);
     this.updateHeadSway(deltaTime, humanoid);
     this.updateSaccades(deltaTime, humanoid);
+    this.talk.speaking = this.isSpeaking;
+    this.talk.enabled = !this.groove.active;
+    this.talk.update(deltaTime, this.vrm);
     this.groove.update(deltaTime, this.vrm);
   }
 

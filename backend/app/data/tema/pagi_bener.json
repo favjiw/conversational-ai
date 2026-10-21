@@ -1,5 +1,5 @@
 {
-  "_note": "Kunci = id slot di clock-pagi-bener-live-1jam.json. Isi masih contoh sementara sampai Tema .docx dari produser di-parsing (docs/STRUKTUR-TEMA-HITS.md). Kunci tanpa slot (hits_news, traffic_info) dicadangkan sampai News/Traffic diputuskan masuk rundown.",
+  "_note": "Kunci = id slot di clock-pagi-bener-live-1jam.json. Isi masih contoh sementara sampai Tema .docx dari produser di-parsing (docs/STRUKTUR-TEMA-HITS.md). Kunci tanpa slot (hits_news, traffic_info) dicadangkan sampai News/Traffic diputuskan masuk rundown. Kunci 'points' = poin/sub-topik untuk Talk panjang (rundown v2.1, 3-10 menit): dibawakan berurutan sepanjang durasi slot, poin terakhir dipegang sampai Talk ditutup.",
   "s07": {
     "title": "Ice Breaking",
     "mode": "improv",
@@ -10,37 +10,149 @@
     "title": "Talk 1 - Opening",
     "mode": "improv",
     "content": "Pembukaan Pagi Bener di 103.9 HITS Unikom Radio. Penyiar siaran ini adalah AI. Hari ini ada Say Hi, segmen 3M, dan SKEMA.",
-    "guidance": "Sapa pendengar, perkenalkan diri sebagai penyiar AI, lalu sebutkan segmen yang akan hadir. Singkat, sekitar 1 menit."
+    "guidance": "Sapa pendengar, perkenalkan diri sebagai penyiar AI, lalu bawakan poin satu per satu. Sekitar 4 menit.",
+    "points": [
+      {
+        "title": "Sapaan pembuka",
+        "content": "Sapa Sobat Hits yang nonton live TikTok, perkenalkan Raka dan Salsa sebagai penyiar AI Pagi Bener."
+      },
+      {
+        "title": "Kabar pagi pendengar",
+        "content": "Tanya aktivitas pagi pendengar: lagi di jalan, di kos, atau siap-siap kuliah. Cuaca dan berita tidak tersedia, jangan dikarang."
+      },
+      {
+        "title": "Bocoran segmen hari ini",
+        "content": "Hari ini ada Say Hi soal serba-serbi ospek, segmen 3M (Mencoba Mengerti Mahasiswa), dan sketsa SKEMA."
+      },
+      {
+        "title": "Ajakan komentar",
+        "content": "Ajak penonton kirim salam, cerita, atau request lagu lewat kolom komentar TikTok."
+      }
+    ]
   },
   "s13": {
     "title": "Talk 2 - Say Hi!",
     "mode": "listener_content",
     "content": "Materi: Serba-serbi Ospek. Pesan pendengar: \"Kak, aku maba, besok hari pertama ospek, deg-degan banget. Ada tips biar nggak canggung?\"",
-    "guidance": "Bacakan pesan pendengar, bereaksi, lalu ngobrol soal pengalaman dan tips ospek dari sudut pandang masing-masing. Ingatkan pendengar kirim salam lewat komentar sekali saja."
+    "guidance": "Bacakan pesan pendengar di poin pertama, lalu bawakan poin berikutnya satu per satu. Ingatkan pendengar kirim salam lewat komentar sekali saja.",
+    "points": [
+      {
+        "title": "Pesan pendengar maba",
+        "content": "Pesan pendengar: \"Kak, aku maba, besok hari pertama ospek, deg-degan banget. Ada tips biar nggak canggung?\" Bacakan lalu bereaksi."
+      },
+      {
+        "title": "Ospek versi Raka dan Salsa",
+        "content": "Cerita pengalaman ospek masing-masing penyiar: yang paling diingat, yang bikin deg-degan."
+      },
+      {
+        "title": "Tips biar nggak canggung",
+        "content": "Tips praktis hari pertama ospek: datang lebih awal, kenalan dengan orang sebelah, bawa barang wajib."
+      },
+      {
+        "title": "Kirim salam",
+        "content": "Ajak penonton yang lagi ospek atau baru lulus ospek kirim salam lewat komentar."
+      }
+    ]
   },
   "s21": {
-    "title": "Talk 3 - Teaser 3M",
+    "title": "Talk 3 - Say Hi! lanjutan + Teaser 3M",
     "mode": "improv",
-    "content": "Segmen 3M (Mencoba Mengerti Mahasiswa) hadir sebentar lagi: pendengar kirim pertanyaan nyeleneh seputar kuliah, dijawab Pak Dosen Agung dan Asdos Akri.",
-    "guidance": "Teaser segmen 3M, ajak pendengar kirim pertanyaan nyeleneh lewat komentar. Cukup sekali ajakan."
+    "content": "Lanjutan Say Hi serba-serbi ospek, lalu teaser segmen 3M (Mencoba Mengerti Mahasiswa) di akhir slot.",
+    "guidance": "Lanjutkan obrolan ospek per poin. Teaser 3M hanya di poin terakhir: ajak pendengar kirim pertanyaan nyeleneh seputar kuliah lewat komentar, cukup sekali ajakan.",
+    "points": [
+      {
+        "title": "Atribut ospek",
+        "content": "Drama atribut dan barang wajib ospek: name tag aneh, tas karung, bekal dengan syarat lucu."
+      },
+      {
+        "title": "Cari teman baru",
+        "content": "Cara cari teman baru di kampus: satu kelompok ospek, satu tongkrongan, satu jurusan."
+      },
+      {
+        "title": "Momen malu jadi maba",
+        "content": "Momen lucu atau malu waktu jadi maba, misalnya salah masuk kelas atau salah panggil kakak tingkat."
+      },
+      {
+        "title": "Pesan buat maba",
+        "content": "Pesan penyemangat buat maba yang lagi berjuang di minggu pertama."
+      },
+      {
+        "title": "Teaser 3M",
+        "content": "Segmen 3M hadir sebentar lagi: pendengar kirim pertanyaan nyeleneh seputar kuliah, dijawab Pak Dosen Agung dan Asdos Akri. Ajak kirim pertanyaan lewat komentar."
+      }
+    ]
   },
   "s30": {
     "title": "Talk 4 - 3M",
     "mode": "listener_content",
     "content": "Pertanyaan pendengar: \"Pak, kalau saya titip absen ke teman tapi temannya juga titip absen ke saya, yang hadir siapa?\"",
-    "guidance": "Raka berperan sebagai Pak Dosen Agung, Salsa sebagai Asdos Akri. Bacakan pertanyaan, jawab dengan gaya dosen dan asdos yang lucu tapi tetap sopan. Pergantian peran ini diminta Tema."
+    "guidance": "Raka berperan sebagai Pak Dosen Agung, Salsa sebagai Asdos Akri. Bawakan pertanyaan per poin, jawab dengan gaya dosen dan asdos yang lucu tapi tetap sopan. Pergantian peran ini diminta Tema.",
+    "points": [
+      {
+        "title": "Titip absen",
+        "content": "Pertanyaan pendengar: \"Pak, kalau saya titip absen ke teman tapi temannya juga titip absen ke saya, yang hadir siapa?\""
+      },
+      {
+        "title": "Tugas kelompok",
+        "content": "Pertanyaan pendengar: \"Pak, kalau tugas kelompok cuma saya yang ngerjain, nilai saya boleh dikali empat?\""
+      },
+      {
+        "title": "Telat 15 menit",
+        "content": "Pertanyaan pendengar: \"Kalau dosen telat 15 menit kami boleh pulang, kenapa kalau mahasiswa telat 15 menit nggak boleh masuk?\""
+      },
+      {
+        "title": "Skripsi bahasa gaul",
+        "content": "Pertanyaan pendengar: \"Pak, skripsi boleh pakai bahasa gaul biar dosen pembimbing nggak bosen?\""
+      },
+      {
+        "title": "Rekap 3M",
+        "content": "Keluar dari peran sebentar, rekap jawaban paling lucu, ajak kirim pertanyaan nyeleneh untuk 3M berikutnya."
+      }
+    ]
   },
   "s40": {
     "title": "Talk 5 - Konten / SKEMA",
     "mode": "improv",
     "content": "SKEMA: sketsa melamar kerja di restoran. Cut 1: pelamar datang telat. Cut 2: wawancara dengan manajer yang aneh. Cut 3: hasil wawancara yang tidak terduga.",
-    "guidance": "Raka berperan sebagai pelamar, Salsa sebagai manajer restoran. Ikuti alur per cut, jaga benang merah cerita, hindari kata kasar. Pergantian peran ini diminta Tema."
+    "guidance": "Raka berperan sebagai pelamar, Salsa sebagai manajer restoran. Ikuti alur per cut, jaga benang merah cerita, hindari kata kasar. Pergantian peran ini diminta Tema.",
+    "points": [
+      {
+        "title": "Cut 1: datang telat",
+        "content": "SKEMA cut 1: pelamar datang telat ke wawancara kerja di restoran dengan alasan yang makin lama makin aneh."
+      },
+      {
+        "title": "Cut 2: manajer aneh",
+        "content": "SKEMA cut 2: wawancara dengan manajer restoran yang pertanyaannya tidak terduga."
+      },
+      {
+        "title": "Cut 3: hasil wawancara",
+        "content": "SKEMA cut 3: hasil wawancara yang tidak terduga, tutup cerita dengan rapi."
+      },
+      {
+        "title": "Keluar peran",
+        "content": "Keluar dari peran, bahas singkat bagian SKEMA yang paling lucu dan ajak penonton komentar."
+      }
+    ]
   },
   "s41": {
     "title": "Closing",
     "mode": "improv",
     "content": "Pamitan Pagi Bener hari ini, terima kasih untuk penonton live, dan ajakan nonton live berikutnya.",
-    "guidance": "Pamitan hangat dan singkat, sebutkan terima kasih dan jadwal live berikutnya."
+    "guidance": "Pamitan hangat per poin, sebutkan terima kasih dan jadwal live berikutnya.",
+    "points": [
+      {
+        "title": "Rekap hari ini",
+        "content": "Rekap singkat Pagi Bener hari ini: Say Hi ospek, 3M, dan SKEMA."
+      },
+      {
+        "title": "Terima kasih",
+        "content": "Terima kasih untuk penonton live dan yang sudah komentar atau request lagu."
+      },
+      {
+        "title": "Sampai jumpa",
+        "content": "Ajak nonton live berikutnya dan follow akun TikTok HITS, lalu pamitan."
+      }
+    ]
   },
   "hits_news": {
     "title": "HITS News",

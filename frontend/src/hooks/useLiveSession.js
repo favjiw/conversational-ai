@@ -42,6 +42,8 @@ export function useLiveSession() {
   const isAudioOwnerRef = useRef(true);
   const [isAudioOwner, setIsAudioOwner] = useState(true);
   const [stageConnected, setStageConnected] = useState(false);
+  // Peringatan output: audio tab stage diblokir autoplay, atau lebih dari satu tab stage terbuka.
+  const [outputWarning, setOutputWarning] = useState({ ownerAudioBlocked: false, stageCount: 0 });
   // Antrean komentar penonton + status layanan rekomendasi lagu (event comment_queue).
   const [commentQueue, setCommentQueue] = useState({ recommender: null, comments: [], waiting: 0 });
 
@@ -161,6 +163,10 @@ export function useLiveSession() {
           isAudioOwnerRef.current = owner;
           setIsAudioOwner(owner);
           setStageConnected(Boolean(msg.data.stage_connected));
+          setOutputWarning({
+            ownerAudioBlocked: Boolean(msg.data.owner_audio_blocked) && msg.data.audio_owner_role === 'stage',
+            stageCount: Number(msg.data.clients?.stage ?? 0),
+          });
         } else if (msg.type === 'speaking') {
           if (!isAudioOwnerRef.current) {
             setActiveSpeaker(msg.data.persona || null);
@@ -414,7 +420,6 @@ export function useLiveSession() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             demo_music_sec: 30,
-            talk_turns_per_slot: 2,
           }),
         });
         const data = await res.json();
@@ -507,6 +512,7 @@ export function useLiveSession() {
     cueSlot,
     isAudioOwner,
     stageConnected,
+    outputWarning,
     commentQueue,
     submitComment,
   };

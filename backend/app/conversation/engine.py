@@ -17,7 +17,7 @@ import random
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from app.llm.client import LLMClient, LLMResponse
 from app.schemas import (
@@ -62,6 +62,12 @@ DIALOG_ACT_HINTS = {
     DialogAct.TRANSITION: "pindahkan obrolan ke sub-topik yang masih berkaitan",
     DialogAct.WRAP_UP: "tutup tema; ini satu-satunya giliran yang boleh menyapa pendengar",
 }
+
+# Talk berbasis durasi (mode clock): instruksi giliran penutup slot Talk.
+TALK_CLOSING_HINT = (
+    "Waktu Talk hampir habis: tutup obrolan dengan rapi dalam giliran ini, misalnya rekap singkat, "
+    "teaser segmen berikutnya, atau ajak pendengar dengerin lagu dulu. Jangan buka topik baru."
+)
 
 ANTI_REPETITION_WINDOW = 6
 TRIGRAM_REPEAT_LIMIT = 3
@@ -206,15 +212,19 @@ def build_persona_turn_prompt(
     session_context: Optional[dict] = None,
     last_turn_in_theme: bool = False,
     previous_theme: Optional[Tema] = None,
+    extra_instructions: Optional[list[str]] = None,
 ) -> str:
     """Build the user prompt for a persona turn.
+
+    ``extra_instructions`` (mode clock: penutup Talk, komentar penonton, gaya HITS) are
+    appended right before the final instruction; ``None`` keeps the prompt unchanged.
 
     ``baseline_v1`` reproduces the pre-v1.1 prompt. ``natural_v2`` injects the
     sampled dialog act, an optional catchphrase, session context, and the
     anti-repetition guidance (FR-4, FR-3, FR-7, FR-5).
     """
     if profile == PromptProfile.BASELINE_V1:
-        return _build_baseline_turn_prompt(tema, partner_name, conversation_history)
+        return _build_baseline_turn_prompt(tema, partner_name, conversation_history, extra_instructions)
     return _build_natural_turn_prompt(
         tema=tema,
         partner_name=partner_name,
@@ -224,13 +234,21 @@ def build_persona_turn_prompt(
         session_context=session_context,
         last_turn_in_theme=last_turn_in_theme,
         previous_theme=previous_theme,
+        extra_instructions=extra_instructions,
     )
+
+
+def _append_extras(parts: list[str], extra_instructions: Optional[list[str]]) -> None:
+    for line in extra_instructions or []:
+        if line:
+            parts.append(f"\n{line}")
 
 
 def _build_baseline_turn_prompt(
     tema: Tema,
     partner_name: str,
     conversation_history: list[dict[str, str]],
+    extra_instructions: Optional[list[str]] = None,
 ) -> str:
     parts: list[str] = []
 
@@ -247,6 +265,7 @@ def _build_baseline_turn_prompt(
         for entry in conversation_history[-10:]:
             parts.append(f"  {entry['name']}: {entry['text']}")
 
+    _append_extras(parts, extra_instructions)
     parts.append("\nSekarang giliranmu bicara. Balas dalam JSON.")
 
     return "\n".join(parts)
@@ -261,6 +280,7 @@ def _build_natural_turn_prompt(
     session_context: Optional[dict],
     last_turn_in_theme: bool,
     previous_theme: Optional[Tema],
+    extra_instructions: Optional[list[str]] = None,
 ) -> str:
     parts: list[str] = []
 
@@ -295,6 +315,7 @@ def _build_natural_turn_prompt(
             f'\nBoleh memakai catchphrase berikut kali ini saja: "{catchphrase}"'
         )
 
+    _append_extras(parts, extra_instructions)
     parts.append("\nSekarang giliranmu bicara. Balas dalam JSON.")
 
     return "\n".join(parts)
@@ -447,11 +468,22 @@ class ConversationEngine:
         turns_per_theme: int = 6,
         on_theme_change=None,
         on_turn=None,
+        should_stop: Optional[Callable[[], bool]] = None,
+        is_closing: Optional[Callable[[], bool]] = None,
+        turn_extras: Optional[Callable[[int, bool], list[str]]] = None,
+        theme_index_fn: Optional[Callable[[int], int]] = None,
     ) -> list[TurnLog]:
         """Run a full Talk slot conversation.
 
         Alternates between persona A and B for up to ``max_turns`` turns.
         Optionally rotates themes from ``theme_playlist`` every ``turns_per_theme`` turns.
+
+        Mode clock (Talk berbasis durasi): ``should_stop`` is checked before every turn
+        after the first (``max_turns`` stays the safety limit), ``is_closing`` marks closing
+        turns (prompt ``TALK_CLOSING_HINT``, logged as ``wrap_up``),
+        ``turn_extras(turn_idx, closing)`` returns extra prompt lines for that turn, and
+        ``theme_index_fn(turn_idx)`` picks the playlist point from elapsed Talk time (no
+        wrap-around, the last point stays until the end). All default to the previous behaviour.
 
         Args:
             tema: Default topic for this slot.
@@ -486,15 +518,26 @@ class ConversationEngine:
             await on_theme_change(current_tema, current_theme_idx)
 
         for turn_idx in range(max_turns):
-            # Check theme rotation
-            if (
+            if should_stop is not None and turn_idx > 0 and should_stop():
+                logger.info("Slot %s stops after %d turns (time budget)", slot_id, turn_idx)
+                break
+
+            # Check theme rotation: by elapsed Talk time (mode clock) or every turns_per_theme turns
+            next_theme_idx: Optional[int] = None
+            if theme_playlist and theme_index_fn is not None:
+                wanted = max(0, min(len(theme_playlist) - 1, theme_index_fn(turn_idx)))
+                if wanted != current_theme_idx:
+                    next_theme_idx = wanted
+            elif (
                 theme_playlist
                 and turns_per_theme > 0
                 and turn_idx > 0
                 and turn_idx % turns_per_theme == 0
             ):
+                next_theme_idx = (turn_idx // turns_per_theme) % len(theme_playlist)
+            if next_theme_idx is not None:
                 previous_theme = current_tema
-                current_theme_idx = (turn_idx // turns_per_theme) % len(theme_playlist)
+                current_theme_idx = next_theme_idx
                 current_tema = theme_playlist[current_theme_idx]
                 self._theme_counter += 1
                 logger.info(
@@ -517,10 +560,17 @@ class ConversationEngine:
             self._state.turn_number = turn_idx + 1
 
             # Is this the last turn of the current theme? (FR-4 wrap_up rule)
-            if theme_playlist and turns_per_theme > 0:
+            if should_stop is not None or theme_index_fn is not None:
+                last_turn_in_theme = False  # Talk berbasis durasi: penutup ditentukan is_closing
+            elif theme_playlist and turns_per_theme > 0:
                 last_turn_in_theme = (turn_idx % turns_per_theme) == (turns_per_theme - 1)
             else:
                 last_turn_in_theme = (turn_idx == max_turns - 1)
+
+            closing = bool(is_closing and is_closing())
+            extras = list(turn_extras(turn_idx, closing)) if turn_extras else []
+            if closing:
+                extras.append(TALK_CLOSING_HINT)
 
             turn_log = await self._run_single_turn(
                 active_persona=active_persona,
@@ -529,6 +579,8 @@ class ConversationEngine:
                 slot_id=slot_id,
                 last_turn_in_theme=last_turn_in_theme,
                 previous_theme=previous_theme,
+                closing=closing,
+                extra_instructions=extras or None,
             )
             turn_logs.append(turn_log)
             if self.logger:
@@ -552,13 +604,19 @@ class ConversationEngine:
         slot_id: str,
         last_turn_in_theme: bool = False,
         previous_theme: Optional[Tema] = None,
+        closing: bool = False,
+        extra_instructions: Optional[list[str]] = None,
     ) -> TurnLog:
         """Execute one turn for a single persona."""
         turn = self._state.turn_number
         latency = LatencyMs()
 
         # ── Sample dialog act + catchphrase (natural_v2 only) ────────────
-        dialog_act = self._sample_dialog_act(active_persona, last_turn_in_theme)
+        # A closing turn of a duration-based Talk is a wrap-up in every profile.
+        if closing:
+            dialog_act: Optional[DialogAct] = DialogAct.WRAP_UP
+        else:
+            dialog_act = self._sample_dialog_act(active_persona, last_turn_in_theme)
         catchphrase = self._sample_catchphrase(active_persona)
 
         # ── Persona call ─────────────────────────────────────────────────
@@ -573,6 +631,7 @@ class ConversationEngine:
             session_context=self.session_context,
             last_turn_in_theme=last_turn_in_theme,
             previous_theme=previous_theme,
+            extra_instructions=extra_instructions,
         )
 
         persona_start = time.perf_counter()

@@ -1,71 +1,69 @@
-# Rundown Live TikTok 1 Jam (DRAF USULAN, belum disetujui HITS/pembimbing)
+# Rundown Live TikTok 1 Jam (DRAF v2.1, belum disetujui HITS/pembimbing)
 
-Turunan dari FORMAT-CLOCK-PAGI-BENER.md. Isi Talk mengacu ke STRUKTUR-TEMA-HITS.md.
+Turunan dari `FORMAT-CLOCK-PAGI-BENER.md`. Isi Talk mengacu ke `STRUKTUR-TEMA-HITS.md`.
+File clock yang dijalankan: `clock-pagi-bener-live-1jam.json` (version 0.3).
 
-## Keputusan Favian (15 Okt 2026)
-- Target live: 1 jam yang compact, urutan elemen mengikuti clock asli (ada opening, jingle, dll.).
-- Yang terpenting adalah segmen TALK, yang diisi percakapan LLM dengan LLM.
+## Riwayat
+- **v1 (15 Okt 2026):** urutan clock asli dipadatkan menjadi 1 jam. Berisi 11 lagu (±33 menit) dan 6 Talk (±16 menit, 1-3 menit per slot).
+- **v2 (21 Okt 2026):** Talk dinilai terlalu singkat dibanding live TikTok HITS yang sedang berjalan, di mana satu blok Talk ±7-8 menit (lihat `ANALISIS-LIVE-TIKTOK-2026-10-20.md`). Aturan: waktu dari sesi yang duplikat atau berlebihan, terutama lagu, dialihkan ke Talk.
+- **v2.1 (21 Okt 2026):** iklan (SPOT/ADLIBS) cukup sekali per kuartal. Tambahan ±3 menit dialihkan ke Talk.
 
-## Prinsip penyusunan draf
-- Kuartal 1 diambil dari pembuka jam 06.00 (time signal, jingle, P.S.A, greetings, ice breaking, bumper opening, Talk Opening).
-- Kuartal 2-4 memakai pola kuartal standar: SMASH VERSI, 2x SPOT/ADLIBS, JINGLE HITS, lagu, Talk, lagu.
-- Kuartal 4 diakhiri CLOSING dari jam 08.00.
-- Belum dimasukkan: TALK HITS NEWS, NEWS & SPORT, dan TRAFFIC INFO. Naskahnya sudah ditulis produser di Tema, jadi bisa dibacakan sebagai naskah tetap. Status: belum diputuskan.
-- Dibuang: SELLING NEXT HOUR (tidak ada jam berikutnya).
-- Asumsi notasi: ('n) = detik, (n) = menit. Dengan asumsi ini satu jam clock asli berjumlah sekitar 60 menit.
+## Prinsip
+1. Lagu tidak diputar berturut-turut; satu lagu menjadi jeda antar-Talk. Jumlah lagu dikurangi dari 11 menjadi 5.
+2. Say Hi dibagi menjadi 2 slot panjang. Teaser 3M menjadi penutup Talk 3, bukan slot sendiri.
+3. SPOT/ADLIBS sekali per kuartal (kuartal 2-4).
+4. Elemen identitas stasiun tetap dipertahankan.
+5. Notasi: ('n) = detik, (n) = menit.
 
-## Draf rundown
-**Kuartal 1 (00:00), sekitar 16,5 menit**
-1. SMASH TIME SIGNAL ('9)
-2. TIME SIGNAL ('10)
-3. JINGLE ALAMAT HITS ('13)
-4. P.S.A (1)
-5. GREETINGS ARTIS ('20)
-6. IMAGE / MASHUP ('32)
-7. ICE BREAKING ('30)
-8. SMASH ABIS TALK 1
-9. BUMPER OPENING ('30)
-10. TALK 1 - OPENING (1)  [LLM-LLM]
-11. LAGU INDO HITS (3)
-12. LAGU BARAT HITS (3)
-13. TALK 2 - SAY HI ! (3)  [LLM-LLM, materi + pesan pendengar]
-14. LAGU INDO (3)
+## Rundown v2.1 (id slot sesuai JSON)
+**Kuartal 1, ±15,6 menit**
+1. s01 SMASH TIME SIGNAL ('9)
+2. s02 TIME SIGNAL ('10)
+3. s03 JINGLE ALAMAT HITS ('18)
+4. s04 P.S.A (1)
+5. s05 GREETINGS ARTIS ('20)
+6. s06 IMAGE / MASHUP ('32)
+7. s07 ICE BREAKING ('30)
+8. s08 SMASH ABIS TALK 1 ('5)
+9. s09 BUMPER OPENING ('30)
+10. s10 TALK 1 - OPENING (4)
+11. s11 LAGU INDO HITS (3)
+12. s13 TALK 2 - SAY HI ! (5)
 
-**Kuartal 2 (00:15), sekitar 14,5 menit**
-1. SMASH VERSI ('5)
-2. SPOT/ADLIBS (1)
-3. SPOT/ADLIBS (1)
-4. JINGLE HITS ('25)
-5. LAGU INDO (3)
-6. TALK 3 - TEASER 3M (3)  [LLM-LLM]
-7. LAGU BARAT (3)
-8. LAGU INDO (3)
+**Kuartal 2, ±14,4 menit**
+1. s16 SMASH VERSI ('5)
+2. s17 SPOT/ADLIBS (1)
+3. s19 JINGLE HITS ('18)
+4. s22 LAGU BARAT (3)
+5. s21 TALK 3 - SAY HI ! lanjutan + TEASER 3M (7)
+6. s20 LAGU INDO (3)
 
-**Kuartal 3 (00:30), sekitar 14,5 menit**
-1. SMASH VERSI ('5)
-2. SPOT/ADLIBS (1)
-3. SPOT/ADLIBS (1)
-4. JINGLE HITS ('25)
-5. LAGU KOREA (3)
-6. TALK 4 - 3M (3)  [LLM-LLM, peran Pak Dosen Agung dan Asdos Akri]
-7. LAGU INDO (3)
-8. LAGU INDO (3)
+**Kuartal 3, ±14,4 menit**
+1. s25 SMASH VERSI ('5)
+2. s26 SPOT/ADLIBS (1)
+3. s28 JINGLE HITS ('18)
+4. s30 TALK 4 - 3M (10)
+5. s29 LAGU KOREA (3)
 
-**Kuartal 4 (00:45), sekitar 14,5 menit**
-1. SMASH VERSI ('5)
-2. SPOT/ADLIBS (1)
-3. SPOT/ADLIBS (1)
-4. JINGLE HITS ('25)
-5. LAGU BARAT (3)
-6. TALK 5 - KONTEN / SKEMA (3)  [LLM-LLM, roleplay]
-7. CLOSING (3)  [LLM-LLM]
-8. LAGU INDO (3)
+**Kuartal 4, ±15,8 menit**
+1. s34 SMASH VERSI ('5)
+2. s35 SPOT/ADLIBS (1)
+3. s37 JINGLE HITS ('18)
+4. s39 BUMPER SKEMA PAGI BENER ('23)
+5. s40 TALK 5 - KONTEN / SKEMA (8)
+6. s42 LAGU INDO (3)
+7. s41 CLOSING (3)
+
+Slot v1 yang dibuang: s12, s14, s18, s23, s27, s31, s32, s36, s38.
 
 ## Ringkasan
-- 6 segmen Talk LLM-LLM, total sekitar 16 menit.
-- 11 lagu, total sekitar 33 menit.
-- Sisanya audio statis dan iklan (TTS).
+| | v1 | v2.1 |
+| --- | --- | --- |
+| Talk LLM-LLM | 6 slot, ±16 menit | 6 slot, ±37 menit (3-10 menit/slot) |
+| Lagu | 11, ±33 menit | 5, ±15 menit |
+| Iklan TTS | 6x | 3x |
+| Total | ±60 menit | ±60 menit |
 
-## Istilah
-- 3M = Mencoba Mengerti Mahasiswa.
-- KONTEN jam 08.00 = SKEMA, segmen drama/sketsa roleplay.
+## Catatan
+- v2.1 menyimpang dari keputusan awal bahwa "urutan elemen asli dipertahankan" (`KEPUTUSAN-DESAIN.md` bagian 4). Perlu disetujui HITS dan pembimbing.
+- Talk harus berhenti berdasarkan durasi slot (`nominal_sec`), bukan jumlah giliran tetap.

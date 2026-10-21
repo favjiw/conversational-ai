@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     GEMINI_MODEL_EMOTION: str = "gemini-3.5-flash-lite"
     GEMINI_MODEL_JUDGE: str = "gemini-flash-latest"
     GEMINI_MODEL_TTS: str = "gemini-3.8-flash-tts"
+    # Batas request per menit per model Gemini (rate_limiter.py). Talk berbasis durasi butuh ±4-5 RPM
+    # untuk persona; naikkan bila kuota free tier model mengizinkan (cek di AI Studio).
+    GEMINI_RPM: int = 5
 
     # --- TTS ---
     TTS_PROVIDER: Literal["gemini", "elevenlabs", "edge", "voicestudio"] = "edge"
@@ -72,6 +75,8 @@ class Settings(BaseSettings):
     RECOMMENDER_TIMEOUT_SEC: float = 8.0  # batas waktu satu rekomendasi sebelum fallback
     RECOMMENDER_MAX_PENDING: int = 5  # maks request lagu penonton yang menunggu
     RECOMMENDER_TALK_MOOD: bool = False  # lagu dari mood topik Talk (KEPUTUSAN-DESAIN §9 belum diputuskan)
+    # Komentar penonton dibacakan di Talk: satu komentar umum setiap N giliran (0 = tidak dibacakan).
+    COMMENT_EVERY_TURNS: int = 5
     RECOMMENDER_LLM_CACHE: bool = False  # cache jawaban LLM hits_rec; mati = latensi di log nyata
 
     # --- Testing ---

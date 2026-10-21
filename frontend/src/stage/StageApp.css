@@ -189,6 +189,24 @@
 .stage-app .ph-progress > div { height: 100%; background: #f59e0b; transition: width 0.5s linear; }
 
 /* Non-blocking Audio Unlock Banner */
+.stage-app .audio-unlock-banner.compact {
+  top: auto;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+.stage-app .audio-unlock-banner.warn {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  top: 8rem;
+}
+.stage-app .audio-unlock-banner.warn.compact {
+  top: auto;
+  bottom: 2.5rem;
+}
 .stage-app .audio-unlock-banner {
   position: absolute;
   top: 5.5rem;
