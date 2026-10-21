@@ -55,7 +55,9 @@ export const FACE_BANDS: Record<PanelSlot, { y0: number; y1: number }> = {
 export const DEFAULT_LAYOUT: StageLayoutConfig = {
   panels: [
     { persona: 'persona_a', faceAt: 0.25, distance: 1.6, fov: 30 },
-    { persona: 'persona_b', faceAt: 0.575, distance: 1.75, fov: 30 },
+    // Closer than the top panel: the face must stay high (comment list below), so a 1.75 m
+    // shot showed the presenter standing once the 3D desk gave way to the studio photo.
+    { persona: 'persona_b', faceAt: 0.59, distance: 1.35, fov: 30 },
   ],
 };
 
