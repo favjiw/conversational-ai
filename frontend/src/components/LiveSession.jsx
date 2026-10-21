@@ -1,5 +1,6 @@
 import React from 'react';
 import Header from './Header';
+import OutputWarnings from './OutputWarnings';
 import SessionConfig from './SessionConfig';
 import SpeakerCards from './SpeakerCards';
 import TranscriptCard from './TranscriptCard';
@@ -40,6 +41,7 @@ export default function LiveSession() {
     slotElapsedSec,
     handleSkipNext,
     stageConnected,
+    outputWarning,
     commentQueue,
     submitComment,
   } = useLiveSession();
@@ -48,6 +50,7 @@ export default function LiveSession() {
     <div className="min-h-screen bg-[#f8f9fb] text-gray-900 font-sans flex flex-col justify-between selection:bg-gray-200">
       <div className="max-w-[1140px] w-full mx-auto px-6 py-8 flex-1">
         <Header isRunning={isRunning} wsConnected={wsConnected} stageConnected={stageConnected} />
+        <OutputWarnings warning={outputWarning} />
 
         <main className="space-y-6">
           <SessionConfig

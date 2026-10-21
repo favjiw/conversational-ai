@@ -74,6 +74,42 @@ class TestOutputRouting(unittest.TestCase):
                     pass
                 runner.playback_feedback.assert_called_once_with(feedback["data"])
 
+    def test_console_sees_when_owner_stage_audio_is_blocked(self):
+        def until(ws, pred):
+            while True:
+                data = _output_status(ws)
+                if pred(data):
+                    return data
+
+        with self.client.websocket_connect("/ws/session?role=console") as console:
+            console.receive_json()
+            self.assertFalse(_output_status(console)["owner_audio_blocked"])
+            with self.client.websocket_connect("/ws/session?role=stage") as stage:
+                stage.receive_json()
+                stage.send_json({"action": "audio_state", "data": {"blocked": True}})
+                view = until(console, lambda d: d["owner_audio_blocked"])
+                self.assertEqual(view["audio_owner_role"], "stage")
+
+                stage.send_json({"action": "audio_state", "data": {"blocked": False}})
+                until(console, lambda d: not d["owner_audio_blocked"])
+
+    def test_blocked_non_owner_does_not_raise_warning(self):
+        with self.client.websocket_connect("/ws/session?role=console") as console,              self.client.websocket_connect("/ws/session?role=stage") as first,              self.client.websocket_connect("/ws/session?role=stage") as second:
+            second.send_json({"action": "audio_state", "data": {"blocked": True}})
+            second.send_json({"action": "ping"})
+            while second.receive_json()["type"] != "pong":
+                pass
+            console.send_json({"action": "ping"})
+            last = None
+            while True:
+                msg = console.receive_json()
+                if msg["type"] == "output_status":
+                    last = msg["data"]
+                if msg["type"] == "pong":
+                    break
+            self.assertEqual(last["clients"]["stage"], 2)  # dua tab stage: konsol bisa memperingatkan
+            self.assertFalse(last["owner_audio_blocked"])  # pemutar (stage tertua) tidak terblokir
+
     def test_speaking_is_relayed_only_from_owner(self):
         with self.client.websocket_connect("/ws/session?role=console") as console, \
              self.client.websocket_connect("/ws/session?role=stage") as stage:

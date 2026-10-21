@@ -84,6 +84,9 @@ export class LiveBroadcastAdapter {
   public onLineStart?: (persona: 'persona_a' | 'persona_b', text: string, wordTimings: LiveTurnData['word_timings'], emotion?: string) => void;
   /** The browser refused to play audio until the viewer interacts with the page. */
   public onAutoplayBlocked?: () => void;
+  /** Output routing: whether this tab plays the audio, and how many stage tabs are open. */
+  public onOutputStatus?: (isAudioOwner: boolean, stageCount: number) => void;
+  private audioBlocked = false;
 
   // Media the browser refused to autoplay. It is held (no "ended" feedback,
   // so the rundown waits) and played on the next user interaction.
@@ -114,6 +117,7 @@ export class LiveBroadcastAdapter {
       this.ws.onopen = () => {
         this.wsConnected = true;
         this.onConnectionChange?.(true);
+        this.sendAudioState();
       };
 
       this.ws.onclose = () => {
@@ -171,6 +175,7 @@ export class LiveBroadcastAdapter {
         this.audioManager.setMuted(!this.isAudioOwner);
         if (this.musicAudio) this.musicAudio.muted = !this.isAudioOwner;
         if (this.stationAudio) this.stationAudio.muted = !this.isAudioOwner;
+        this.onOutputStatus?.(this.isAudioOwner, Number(msg.data?.clients?.stage ?? 0));
         break;
       }
 
@@ -457,6 +462,18 @@ export class LiveBroadcastAdapter {
       this.setMusicPlaying(false);
       this.sendFeedback(data, 'ended');
     });
+  }
+
+  /** Tell the backend whether autoplay holds this tab's audio (the console shows a warning). */
+  public reportAudioState(blocked: boolean): void {
+    this.audioBlocked = blocked;
+    this.sendAudioState();
+  }
+
+  private sendAudioState(): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ action: 'audio_state', data: { blocked: this.audioBlocked } }));
+    }
   }
 
   /** Update local listeners and tell muted consoles who is audible. */
