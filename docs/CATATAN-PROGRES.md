@@ -34,7 +34,7 @@ Konfigurasi preview juga ada di `.claude/launch.json` (`backend`, `backend-mock`
 | `http://localhost:3000/` | Konsol operator: pilih mode, mulai/hentikan live, transkrip, rundown |
 | `/stage-3d-realistic` | Output live gaya realistis (Rocketbox GLB) |
 | `/stage-animation` | Output live gaya animasi/VTuber (VRM) |
-| `/stage` | Gaya default dari `avatar.config.json` (`?style=animation` untuk mengganti) |
+| `/stage` | Gaya default dari `avatar.config.json`: **animasi (VRM)** sejak 21 Okt (`?style=realistic` untuk mengganti) |
 | `?clean=1` | Tampilan bersih untuk ditangkap TikTok LIVE Studio/OBS |
 | `?zones=1` | Overlay zona aman TikTok dan penanda posisi wajah |
 | `?mode=debug` | Lab avatar: toolbar, lil-gui, FPS, slider ARKit, input "Ucapkan" teks |
@@ -66,6 +66,7 @@ Butuh `pip install playwright imageio-ffmpeg` dan Google Chrome terpasang. Chrom
   - **Key ElevenLabs dan Groq sempat ditulis di chat; rotasi key di dashboard masing-masing, lalu perbarui kedua `.env`.**
 - `frontend/public/avatar.config.json` berisi:
   - `defaultStyle`, `styles` (realistic dan animation: karakter dan tone mapping);
+  - `background` (21 Okt): foto studio HITS (`public/backgrounds/studio-hits-unikom.jpg`) di belakang kedua panel, untuk kedua gaya; `focusY` = bagian foto yang ditengahkan (0 = atas). Studio prosedural (dinding, papan neon, meja, mic 3D) tidak dibangun bila foto ada; rim light tetap. Pose tangan-di-meja GLB jadi tampak menggantung karena meja 3D hilang;
   - `program` (judul, stasiun, `pinnedQuestion`);
   - `layout` (urutan panel dan framing, opsional);
   - parameter `lipsync`, `expression`, `idle`, `viseme`, `glbFace`.

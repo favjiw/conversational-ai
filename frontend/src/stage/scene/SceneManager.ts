@@ -83,6 +83,9 @@ export class SceneManager {
   clock: THREE.Clock;
   characters: Map<string, AvatarCharacter>;
   private studio: StudioSet | null = null;
+  /** Rim lights when a photo backdrop replaces the procedural studio. */
+  private studioLights: THREE.Group | null = null;
+  private backdrop: THREE.Texture | null = null;
   private environment: THREE.Texture | null = null;
   private keyLight!: THREE.DirectionalLight;
   private layout: StageLayoutConfig;
@@ -233,6 +236,9 @@ export class SceneManager {
    */
   buildStudio() {
     this.studio?.dispose();
+    this.studio = null;
+    this.studioLights?.removeFromParent();
+    this.studioLights = null;
     const spots: StudioSpot[] = PERSONAS.map((personaId) => ({
       personaId,
       x: this.presenterX(personaId),
@@ -241,14 +247,47 @@ export class SceneManager {
       // One sign, in the top panel: the bottom panel's top edge meets the program pill
       sign: this.layout.panels[0].persona === personaId ? STUDIO_SIGNS.persona_a : null,
     }));
-    this.studio = new StudioSet(spots);
+    // A studio photo backdrop already shows wall, sign, desk and mic: only the rim lights stay.
+    const group = this.backdrop ? new THREE.Group() : (this.studio = new StudioSet(spots)).group;
     for (const spot of spots) {
       // Colored rim light behind each presenter for separation from the wall
       const rim = new THREE.PointLight(RIM_COLORS[spot.personaId], 1.4, 2.0, 2);
       rim.position.set(spot.x - spot.outerSide * 0.5, spot.headY + 0.35, -0.7);
-      this.studio.group.add(rim);
+      group.add(rim);
     }
-    this.scene.add(this.studio.group);
+    if (this.backdrop) this.studioLights = group;
+    this.scene.add(group);
+  }
+
+  /**
+   * Use a studio photo as the background of both panels (CSS-like "cover" for the
+   * 1080x960 panel). `focusY` is the image height fraction (0 = top) centred in the
+   * panel. Call before buildStudio(); a failed load keeps the procedural studio.
+   */
+  async setBackdrop(url: string, focusY = 0.4): Promise<boolean> {
+    try {
+      const texture = await new THREE.TextureLoader().loadAsync(url);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const image = texture.image as { width: number; height: number };
+      const imageAspect = image.width / image.height;
+      const panelAspect = CANVAS_WIDTH / (CANVAS_HEIGHT / 2);
+      if (imageAspect < panelAspect) {
+        // Taller than the panel: show the full width and a band of the height
+        texture.repeat.set(1, imageAspect / panelAspect);
+        const centre = 1 - THREE.MathUtils.clamp(focusY, 0, 1);
+        texture.offset.set(0, THREE.MathUtils.clamp(centre - texture.repeat.y / 2, 0, 1 - texture.repeat.y));
+      } else {
+        texture.repeat.set(panelAspect / imageAspect, 1);
+        texture.offset.set((1 - texture.repeat.x) / 2, 0);
+      }
+      this.backdrop?.dispose();
+      this.backdrop = texture;
+      this.scene.background = texture;
+      return true;
+    } catch (err) {
+      console.warn('[SceneManager] Backdrop failed, keeping the procedural studio:', err);
+      return false;
+    }
   }
 
   async loadCharacter(personaId: string, spec: CharacterSpec): Promise<void> {
@@ -412,6 +451,7 @@ export class SceneManager {
   dispose() {
     this.renderer.domElement.remove();
     this.studio?.dispose();
+    this.backdrop?.dispose();
     this.environment?.dispose();
     this.renderer.dispose();
     this.characters.forEach((character) => {

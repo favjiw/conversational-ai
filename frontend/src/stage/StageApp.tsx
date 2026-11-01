@@ -67,7 +67,7 @@ function resolveStyleId(config: AvatarConfigFile): string {
   return STYLE_ROUTES[path]
     ?? new URLSearchParams(window.location.search).get('style')
     ?? config.defaultStyle
-    ?? 'realistic';
+    ?? 'animation';
 }
 
 interface AvatarConfigFile {
@@ -86,6 +86,8 @@ interface AvatarConfigFile {
   /** Animation style: arms hang this many degrees from vertical (calibrated per model). */
   restPose?: { armDownDeg?: number };
   glbFace?: { jawScale?: number };
+  /** Studio photo behind the presenters (both styles); focusY = image part centred in a panel (0 = top). */
+  background?: { image?: string; focusY?: number };
   viseme?: Partial<VisemeLipSyncConfig>;
   /** Program overlay: title, station, pinned bait question. */
   program?: Partial<ProgramInfo>;
@@ -314,6 +316,9 @@ export function StageApp() {
           return;
         }
 
+        if (avatarConfig.background?.image) {
+          await sceneManager.setBackdrop(avatarConfig.background.image, avatarConfig.background.focusY);
+        }
         sceneManager.buildStudio();
         setCharacterNames({
           persona_a: sceneManager.characters.get('persona_a')?.name ?? 'Raka',

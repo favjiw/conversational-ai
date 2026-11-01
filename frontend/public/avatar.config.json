@@ -1,5 +1,5 @@
 {
-  "defaultStyle": "realistic",
+  "defaultStyle": "animation",
   "styles": {
     "realistic": {
       "label": "3D Realistis",
@@ -37,6 +37,10 @@
         "toneMapping": "none"
       }
     }
+  },
+  "background": {
+    "image": "/backgrounds/studio-hits-unikom.jpg",
+    "focusY": 0.4
   },
   "quality": "medium",
   "lipsync": {

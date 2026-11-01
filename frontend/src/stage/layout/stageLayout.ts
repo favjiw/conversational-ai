@@ -48,14 +48,17 @@ export interface StageLayoutConfig {
 /** Where each face must land (bands drawn green in the debug overlay). */
 export const FACE_BANDS: Record<PanelSlot, { y0: number; y1: number }> = {
   top: { y0: 0.22, y1: 0.28 },
-  // Raised from the panel centre so the comment list does not cover it
-  bottom: { y0: 0.55, y1: 0.60 },
+  // 21 Okt: lowered so the bottom presenter is a half-body shot down to the hair tips (Favian's
+  // choice). The face now sits inside the comment list zone, so TikTok comments can cover it.
+  bottom: { y0: 0.70, y1: 0.76 },
 };
 
 export const DEFAULT_LAYOUT: StageLayoutConfig = {
   panels: [
     { persona: 'persona_a', faceAt: 0.25, distance: 1.6, fov: 30 },
-    { persona: 'persona_b', faceAt: 0.575, distance: 1.75, fov: 30 },
+    // Half-body shot down to the hair tips (a 1.75 m shot with the face at 0.575 showed the
+    // presenter standing once the 3D desk gave way to the studio photo).
+    { persona: 'persona_b', faceAt: 0.73, distance: 1.35, fov: 30 },
   ],
 };
 
